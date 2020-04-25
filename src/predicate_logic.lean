@@ -241,7 +241,6 @@ inductive entails : set uformula → uformula → Prop
 | for_all_intro
             (Γ : set uformula) (φ : uformula)
             (x : ℕ) (xf : x ∈ φ.free)
-            -- (y ∉ φ.vars)
             (abs : nat.abstract_in x Γ)
             (h : entails Γ φ)
              : entails Γ (uformula.for_all x φ)
@@ -460,7 +459,7 @@ lemma bind₃ : ∀ {ass : vasgn} {x y : ℕ} {a b} {M:model} {φ},
             rw bind₂,
             simp,
         induction φ;
-        dunfold model.satisfies';
+        dunfold model.satisfies' vasgn.bind;
         intros h₁ h₂,
         swap,
             contradiction,
@@ -478,18 +477,7 @@ lemma bind₃ : ∀ {ass : vasgn} {x y : ℕ} {a b} {M:model} {φ},
             -- simp [h, bind₂],
     end
 
--- this annoying lemma is absolutely required to prove the
--- following fundamental lemma for the proof.
-lemma annoying {p q : Prop} : ((p → q) → (q → p)) → ((q → p) → (p → q)) → (p ↔ q) :=
-begin
-    intros h₁ h₂,
-    constructor;
-    intro h,
-        exact h₂ (λ_,h) h,
-    exact h₁ (λ_,h) h,
-end
-
-lemma almost : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
+lemma bind₅ : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
@@ -568,246 +556,21 @@ begin
     -- set f := (vasgn.bind ass φ_a a₂),
     -- simp [vasgn.bind] at *,
     admit,
-    -- have c := h₃ (ass.bind x a φ_a),
-    -- rw bind at c,
-    -- have ih := φ_ih h,
-    -- -- specialize h₃ a₂,
-    -- admit,
-    --     intros h₄,
-    --     replace h₁ := not_or_distrib.mp h₁,
-    --     obtain ⟨h₀, h₁⟩ := h₁,
-    --     have ih := φ_ih_a_1 h₁,
-    --     apply ih;
-    --     clear ih,
-    --         intro h₅,
-    --         admit,
-        
-    --     apply h₂,
 
 end
 
-lemma bind₄ : ∀ {ass : vasgn} {x : ℕ} {a} {M:model} {φ:uformula},
-              x ∉ φ.free →
-              M.satisfies' φ (ass.bind x a) →
-              M.satisfies' φ ass
-              :=
+lemma fundamental : ∀ y x (M : model) ass, nat.abstract_in y Γ → 
+            (∀ φ ∈ Γ, M.satisfies' φ ass) →
+            ( ∀φ ∈ Γ, M.satisfies' φ (ass.bind y x))
+            :=
+        
 begin
-    intros ass x a M φ, --h₁ h₂,
-
-    induction φ;
-    dunfold uformula.free model.satisfies';-- vasgn.bind;
-    simp;
-    intros h₁ h₂,
-        convert h₂,
-        ext y,
-        specialize h₀ y,
-        revert h₀,
-        induction φ_v y;
-        dunfold term.vars model.reference',
-            admit,
-        -- simp,
-        intro h₀,
-        cases n;
-            dunfold model.reference',
-            refl,
-        simp at *,
-        congr,
-        ext z,
-        exact ih z (h₀ z),
-    intro a₂,
-    classical,
-    rename _inst_1 dont_annoy,
-    by_cases (x ∈ φ_a_1.free),
-        rw (h₀ h) at h₂,
-        specialize h₂ a₂,
-        rw bind₂ at h₂,
-        exact h₂,
-    have c := h₂ (vasgn.bind ass x a φ_a),
-    -- rw ←eq at c,
-    -- simp [asg] at c,
-    rw bind at c,
-    have ih := φ_ih h,
-    specialize h₂ a₂,
-    admit,
-    -- exact bind₃ ih h₂,
-        intro h₃,
-        replace h₀ := not_or_distrib.mp h₀,
-        obtain ⟨h₀, h₅⟩ := h₀,
-        apply φ_ih_a_1,
-            assumption,
-            admit,
-        
-        -- swap,
-        --     assumption,
-        -- apply h₁,
-        -- rename φ_ih_a ih,
-        -- clear h₁ h₂ φ_ih_a_1 φ_a_1,
-        -- rename h₃ h₁,
-        revert φ_a,
-        intro φ,
-        induction φ;
-        dunfold uformula.free model.satisfies';-- vasgn.bind;
-        simp;
-        intros h₀ h₁ h₂,
-            admit,
-            admit,
-        
-        
+    intros y x M ass h₁ h₂ φ H,
+    simp [nat.abstract_in] at h₁,
+    specialize h₁ φ H,
+    specialize h₂ φ H,
+    exact (bind₅ h₁).2 h₂,
 end
-
-lemma nameless : ∀ (M:model) asg {φ ψ}, ¬ M.satisfies' φ asg → M.satisfies' (φ ⇒ ψ) asg :=
-begin
-    intros M asg φ ψ h₁,
-
-end
-
-lemma aux₂ : ∀ (M:model) x asg, x ∉ φ.free → M.satisfies' φ asg → ∀t, M.satisfies' φ (asg.bind x t) :=
-begin
-    intros M x asg,
-    induction φ;
-    dunfold uformula.free model.satisfies';
-    intros h₁ h₂;
-    simp at h₁,
-    swap,
-        contradiction,
-    intro t,
-    convert h₂,
-    ext,
-    specialize h₁ x_1,
-    revert h₁,
-    induction φ_v x_1;
-    dunfold model.reference' vasgn.bind term.vars;
-    intro h₁;
-        simp at h₁,
-        replace h₁ := ne.symm h₁,
-        simp [h₁],
-    cases n;
-        dunfold model.reference',
-        refl,
-    simp,
-    congr,
-    ext,
-    exact ih x_2 (h₁ x_2),
-        intros t a,
-        classical,
-        rename _inst_1 dont_annoy,
-        by_cases (x ∈ φ_a_1.free),
-            rw (h₁ h),
-            rw bind₂,
-            exact h₂ a,
-        have c := h₂ (asg φ_a),
-        rw bind at c,
-        have ih := φ_ih h c t,
-        specialize h₂ a,
-        exact bind₃ ih h₂,
-    simp at *,
-    intros t h₃,
-    replace h₁ := not_or_distrib.mp h₁,
-    obtain ⟨h₀, h₁⟩ := h₁,
-    have ih := φ_ih_a_1 h₁,
-    apply ih,
-    apply h₂,
-    -- clear ih h₁ h₂ φ_ih_a_1 φ_ih_a φ_a_1,
-    -- revert t,
-    exact bind₄ h₃ h₀,
-    -- revert h₀ h₃,
-    -- induction φ_a;
-    -- dunfold uformula.free model.satisfies';-- vasgn.bind;
-    -- simp;
-    -- intros h₁ h₂,
-    --     convert h₂,
-    --     ext,
-    --     specialize h₁ x_1,
-    --     revert h₁,
-    --     induction φ_a_v x_1;
-    --     dunfold term.vars model.reference',
-    --         admit,
-    --     -- simp,
-    --     intro h₂,
-    --     cases n;
-    --         dunfold model.reference',
-    --         refl,
-    --     simp at *,
-    --     congr,
-    --     ext,
-    --     exact ih x_2 (h₂ x_2),
-    -- intro a₂,
-    -- classical,
-    -- rename _inst_1 dont_annoy,
-    -- by_cases (x ∈ φ_a_a_1.free),
-    --     rw (h₁ h) at h₂,
-    --     specialize h₂ a₂,
-    --     rw bind₂ at h₂,
-    --     exact h₂,
-    -- have c := h₂ (vasgn.bind asg x t φ_a_a),
-    -- -- rw ←eq at c,
-    -- -- simp [asg] at c,
-    -- rw bind at c,
-    -- have ih := φ_a_ih h c,
-    -- specialize h₂ a₂,
-    --     admit,
-    
-
-    -- specialize h₂ h₃,
-        -- simp [vasgn.bind] at *,
-        -- cases φ_n,
-        --     exact fin_zero_elim x_1,
-        -- simp [of_fn_succ, list.vars] at h₁,
-        -- replace h₁ := not_or_distrib.mp h₁,
-        -- obtain ⟨h₀, h₁⟩ := h₁,
-        -- obtain ⟨xₙ, lt⟩ := x_1,
-        -- induction xₙ,
-        -- -- by_cases x_1 = 0,
-        --     -- rw h,
-        --     simp,
-        --     revert h₀,
-        --     induction (φ_v 0);
-        --         dunfold model.reference' vasgn.bind term.vars,
-        --         intro h₀,
-        --         simp at h₀,
-        --         replace h₀ := ne.symm h₀,
-        --         simp [h₀],
-        --     simp,
-        --     intro h₀,
-        --     cases n;
-        --         dunfold model.reference',
-        --         refl,
-        --     simp,
-        --     congr,
-        --     ext,
-        --     exact ih x_1 (h₀ x_1),
-        -- have lt₂ := nat.lt_of_succ_lt_succ lt,
-        -- cases φ_n,
-        --     replace lt₂ : false := nat.not_succ_le_zero xₙ_n lt₂,
-        --     contradiction,
-        
-            -- have c : x_1 = 0 := subsingleton.elim x_1 0,
-            -- contradiction,
-        -- simp [of_fn_succ, list.vars] at h₁,
-        -- revert h₁,
-        -- dunfold of_fn of_fn_aux list.vars,
-        -- intro h₁,
-        -- induction (φ_v x_1),
-        --     -- dunfold of_fn of_fn_aux of_fn._proof_1 list.vars,
-        --     -- dunfold model.reference' vasgn.bind,
-        --     replace h₂ := h₂ x_1,
-        --     simp[of_fn, of_fn._proof_1, of_fn_aux, list.vars] at h₁,
-            
-        -- simp [of_fn_succ, list.vars] at h₁,
-            -- simp [term.vars] at h₀,
-end
-
-
-lemma aux : ∀ y x (M : model) ass, nat.abstract_in y Γ → 
-            (∀ φ, Γ ⊢ φ → M.satisfies' φ ass) →
-            ((∀φ , Γ ⊢ φ → M.satisfies' φ (ass.bind y x))) :=
--- begin
---     intros y x M ass h₁ h₂ φ entails,
---     induction entails,
---     swap 5,
---     intros a asg h₃ h₄,
---     have ih := entails_ih h₁ h₂,
--- end
 
 -- lemma bind_rw : ∀ {M:model} {t₁ t₂ : term} x ass, M.reference' (t₁.rw x t₂) ass = M.reference' t₁ (ass.bind x (M.reference' t₂ ass)) :=
 -- begin
@@ -942,19 +705,43 @@ lemma aux : ∀ y x (M : model) ass, nat.abstract_in y Γ →
 --         admit,
 --     end
 
+lemma aux : ∀ {M:model} {ass:vasgn} {x t} {φ:uformula}, M.satisfies' (φ.rw x t) ass ↔ M.satisfies' φ (ass.bind x (M.reference' t ass)) :=
+begin
+    intros M ass x t φ,
+    induction φ;
+    dunfold uformula.rw model.satisfies';
+    try{simp};
+    constructor;
+    intro h,
+        convert h,
+        ext y,
+        induction φ_v y;
+        dunfold term.rw model.reference' vasgn.bind,
+            by_cases eq : a = x;
+                simp [eq],
+            replace eq := ne.symm eq,
+            simp [eq],
+            dunfold model.reference',
+            refl,
+        simp,
+        cases n,
+
+
+end
+
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
 begin
     intros entails M ass h,
-    induction entails,
+    induction entails generalizing ass,
     -- case reflexive
     exact h entails_φ entails_h,
     -- case transitivity
     apply entails_ih_h₂,
     intros ψ H,
-    exact entails_ih_h₁ ψ H h,
+    exact entails_ih_h₁ ψ H ass h,
     -- case modus ponens
-    have c₁ := entails_ih_h₁ h,
-    have c₂ := entails_ih_h₂ h,
+    have c₁ := entails_ih_h₁ ass h,
+    have c₂ := entails_ih_h₂ ass h,
     -- intro ass,
     -- specialize c₁ ass,
     -- specialize c₂ ass,
@@ -973,59 +760,103 @@ begin
     simp at H,
     rwa H,
     -- case universal intro
-    -- revert Γ,
-    intros x,
-    have sat := entails_ih h,
+    intro x,
+    have c := fundamental entails_Γ entails_x x,
+    specialize c M ass entails_abs h,
+    have ih := entails_ih (ass.bind entails_x x),
+    apply ih,
+    exact c,
     -- exact universal_generalization entails_φ M ass entails_x entails_y_1 sat,
 
-    -- clear h,
-    -- clear entails_ih,
-    
-    -- revert ass,
-    -- exact semantic_generalization φ M entails_x sat,
-    -- tactic.unfreeze_local_instances,
-    -- dunfold nat.abstract_in at *,
-    -- revert asg,
-    -- revert x,
-    -- admit,
-    -- focus {
-    --     induction entails_φ;
-    --     revert sat;
-    --     dunfold model.satisfies';
-    --     try{simp};
-    --     intro sat;
-    --     convert sat;
-    --     try{simp},
-    --         ext,
-    --         focus {
-    --             induction (entails_φ_v x_1),
-    --                 dunfold model.reference',
-    --                 revert asg,
-    --             -- dunfold term.rw,
-    --             by_cases entails_x = a,
-    --             -- simp [h],
-                
-    --         },
-    --     revert sat;
-    --     dunfold uformula.rw;
-    --     dunfold model.satisfies';
-    --     try{simp},
-    --         intro sat,
-    -- },
-    -- admit,
     -- case universal elim
-    -- focus {
-    --     induction entails_φ;
-    --     have sat := entails_ih h;
-    --     revert sat;
-    --     dunfold uformula.rw; try{simp},
-    --     -- I cant go any further applying strategies to
-    --     -- all goals because the linter gets very slow.
-    --     dunfold model.satisfies', try{simp},
-    --         intro sat,
-    -- },
-    -- have sat := entails_ih h,
-    admit,
+    have ih := entails_ih ass h,
+    clear entails_ih,
+    revert ih,
+    dunfold model.satisfies',
+    intro ih,
+    set ref := M.reference' entails_t ass,
+    specialize ih ref,
+    exact aux.2 ih,
+    -- induction entails_φ generalizing ass;
+    -- dunfold uformula.rw model.satisfies';
+    -- intro ih,
+    --     convert ih (M.reference' entails_t ass),
+    --     ext y,
+    --     induction entails_φ_v y;
+    --     dunfold term.rw model.reference',
+    --         by_cases entails_x = a;
+    --             simp [vasgn.bind, h],
+    --         dunfold model.reference',
+    --         replace h := ne.symm h,
+    --         simp [h],
+    --     cases n;
+    --         dunfold model.reference',
+    --         refl,
+    --     simp at *,
+    --     congr,
+    --     ext z,
+    --     exact ih_1 z,
+    -- tactic.unfreeze_local_instances,
+    -- obtain ⟨x⟩ := _inst_2,
+    -- exact ih x,
+    --     intro a,
+    --     by_cases eq : entails_φ_a = entails_x;
+    --         simp[eq],
+    --         specialize ih (ass entails_x) a,
+    --         simp [eq, bind₂] at ih,
+    --         exact ih,
+    --     -- here we will need the fundamental lemma
+    --     admit,
+    -- simp at *,
+    --         -- simp [ne.symm, h],
+    -- -- clear h,
+    -- -- clear entails_ih,
+    
+    -- -- revert ass,
+    -- -- exact semantic_generalization φ M entails_x sat,
+    -- -- tactic.unfreeze_local_instances,
+    -- -- dunfold nat.abstract_in at *,
+    -- -- revert asg,
+    -- -- revert x,
+    -- -- admit,
+    -- -- focus {
+    -- --     induction entails_φ;
+    -- --     revert sat;
+    -- --     dunfold model.satisfies';
+    -- --     try{simp};
+    -- --     intro sat;
+    -- --     convert sat;
+    -- --     try{simp},
+    -- --         ext,
+    -- --         focus {
+    -- --             induction (entails_φ_v x_1),
+    -- --                 dunfold model.reference',
+    -- --                 revert asg,
+    -- --             -- dunfold term.rw,
+    -- --             by_cases entails_x = a,
+    -- --             -- simp [h],
+                
+    -- --         },
+    -- --     revert sat;
+    -- --     dunfold uformula.rw;
+    -- --     dunfold model.satisfies';
+    -- --     try{simp},
+    -- --         intro sat,
+    -- -- },
+    -- -- admit,
+    -- -- case universal elim
+    -- -- focus {
+    -- --     induction entails_φ;
+    -- --     have sat := entails_ih h;
+    -- --     revert sat;
+    -- --     dunfold uformula.rw; try{simp},
+    -- --     -- I cant go any further applying strategies to
+    -- --     -- all goals because the linter gets very slow.
+    -- --     dunfold model.satisfies', try{simp},
+    -- --         intro sat,
+    -- -- },
+    -- -- have sat := entails_ih h,
+    -- admit,
 end
 
 
