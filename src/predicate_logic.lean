@@ -189,6 +189,7 @@ def uformula.terms : uformula → set term
 def term.abstract_in : term → set uformula → Prop
 | t S := t ∉ (⋃ φ ∈ S, uformula.terms φ)
 
+@[reducible]
 def nat.abstract_in : ℕ → set uformula → Prop
 | x S := x ∉ (⋃ φ ∈ S, uformula.free φ)
 
@@ -198,8 +199,39 @@ def uformula.generalize : uformula → list ℕ → uformula
 | φ [] := φ
 | φ (x::xs) := uformula.for_all x $ φ.generalize xs
 
--- theorem uformula_rw : ∀ (φ : uformula)(t : term) (x : ℕ), x ∉ φ.free → φ.rw x t = φ :=
---     sorry
+theorem uformula_rw : ∀ {φ : uformula} {x : ℕ}, x ∉ φ.free → ∀(t : term),φ.rw x t = φ :=
+    begin
+        intros φ x h t,
+        revert h,
+        induction φ;
+        dunfold uformula.free uformula.rw;
+        simp;
+        intro h,
+            ext y,
+            specialize h y,
+            revert h,
+            induction φ_v y;
+            dunfold term.rw term.vars;
+            intro h;
+            simp at *,
+                simp[h],
+            ext z,
+            specialize h z,
+            specialize ih z,
+            exact ih h,
+        classical,
+        rename _inst_1 dont_annoy,
+        by_cases eq₁ : x ∈ φ_a_1.free,
+            simp [h eq₁],
+        by_cases eq₂ : φ_a = x;
+            simp [eq₂],
+        exact φ_ih eq₁,
+            push_neg at h,
+            obtain ⟨h₁, h₂⟩ := h,
+            constructor;
+            apply_assumption;
+            assumption,
+    end
 
 lemma trivial_uformula_rw : ∀ {φ:uformula} {x}, φ.rw x (term.var x) = φ :=
     begin
@@ -250,27 +282,12 @@ inductive entails : set uformula → uformula → Prop
             (t : term) --(den : t.denotes)
             (h : entails Γ (uformula.for_all x φ))
              : entails Γ (φ.rw x t)
--- def minimal.theorem (φ : uformula) := entails ∅ φ
 
-local infixr `⊢`:55 := λ Γ (φ : uformula), entails Γ φ
+local infixr `⊢`:55 := entails
 
 variables (Γ : set uformula) (φ : uformula)
 
--- theorem generalization_theorem : ∀ (x : ℕ), (∀ (ψ:uformula), ψ ∈ Γ → x ∉ ψ.free) → Γ ⊢ φ → Γ ⊢ (uformula.for_all x φ) :=
--- begin
---     intros x hx h,
---     apply entails.for_all_intro Γ φ x _ _,
---     -- dunfold nat.abstract_in,
---     -- simp,
---     assumption,
---     intros ψ H,
---     specialize hx ψ H,
---     exact hx,
---     rw trivial_uformula_rw,
---     exact h,
--- end
-
-theorem self_entailment : entails Γ (φ ⇒ φ) :=
+theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
 begin
     apply entails.intro,
     apply entails.reflexive (Γ∪{φ}) φ,
@@ -279,69 +296,16 @@ end
 
 variables (Δ : set uformula) (ψ : uformula)
 
--- theorem monotonicity : Δ ⊆ Γ → entails Δ ψ → entails Γ ψ :=
--- begin
---     intros H h,
---     -- induction on the possible ways in which
---     -- Δ could prove ψ
---     induction h,
---     -- case it was proven by reflection
---         apply entails.reflexive Γ h_φ,
---         exact H h_h,
---     -- case it was proven by transitivity
---         apply entails.transitivity Γ h_Δ h_φ,
---         intros ψ₂ elem,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by and_intro
---         apply entails.and_intro,-- h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by and_elim_left
---         apply entails.and_elim_left h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by and_elim_right
---         apply entails.and_elim_right h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by or_intro_left
---         apply entails.or_intro_left h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by or_intro_right
---         apply entails.or_intro_right h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by or_elim
---         apply entails.or_elim,-- h_φ h_ψ h_δ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by modus ponens
---         apply entails.modus_ponens h_φ h_ψ Γ,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by intro
---         have c : entails h_Γ (h_φ ⇒ h_ψ),
---             apply entails.intro h_φ h_ψ h_Γ,
---             assumption,
---         apply entails.transitivity Γ h_Γ (h_φ ⇒ h_ψ),
---             intros ψ₂ elem,
---             have c₂ := H elem,
---             exact entails.reflexive Γ ψ₂ c₂,
---         assumption,
---     -- case it was proven by true_intro
---         exact entails.true_intro Γ,
---     -- case it was proven by for_all_intro
---         apply entails.for_all_intro Γ h_φ h_x h_xf h_c,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by for_all_elim
---         apply entails.for_all_elim Γ h_φ h_x h_xf,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by exists_intro
---         apply entails.exists_intro Γ h_φ h_x h_xf h_t,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by exists_elim
---         apply entails.exists_elim Γ h_φ h_ψ h_x h_xf,
---         repeat {assumption <|> apply_assumption},
---     -- case it was proven by identity_intro
---         apply entails.identity_intro Γ h_t,
---     -- case it was proven by identity_elim
---         apply entails.identity_elim Γ h_φ h_x h_xf h_t₁ h_t₂,
---         repeat {assumption <|> apply_assumption},
--- end
+theorem monotonicity : Δ ⊆ Γ → Δ ⊢ ψ → Γ ⊢ ψ :=
+begin
+    intros H h,
+    have c₁ : ∀ φ ∈ Δ, entails Γ φ,
+        intros φ hφ,
+        apply entails.reflexive Γ φ,
+        exact H hφ,
+    apply entails.transitivity;
+    assumption,
+end
 
 section semantics
 
@@ -383,7 +347,18 @@ def model.reference (M : model) : pterm → α :=
         cases t_n,
             exact model.I₁ M t_f fin_zero_elim,
         have den_v : ∀ x, (t_v x).denotes,
-            admit,
+            intro x,
+            simp [set_of] at den,
+            revert den,
+            dunfold term.denotes term.vars,
+            simp,
+            intro den,
+            have c := set.subset_Union (logic.term.vars ∘ t_v) x,
+            simp [den] at c,
+            -- could have used the set lemma,
+            -- but library search finished
+            -- this one off.
+            exact eq_bot_iff.mpr c,
         have ih := λ x, t_ih x (den_v x),
         exact model.I₁ M t_f ih,
     end
@@ -430,6 +405,16 @@ def theory.follows : Prop :=
 
 local infixr `⊨`:55 := theory.follows
 
+lemma bind_symm : ∀ {ass : vasgn} {x y : ℕ} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a :=
+    begin
+        intros ass x y a b h,
+        simp [vasgn.bind],
+        ext z,
+        replace h := ne.symm h,
+        by_cases eq : z = y;
+            simp[eq, h],
+    end
+
 lemma bind : ∀ {ass : vasgn} {x : ℕ}, ass.bind x (ass x) = ass :=
     begin
         intros ass x,
@@ -448,35 +433,6 @@ lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass
         simp[h],
     end
 
-lemma bind₃ : ∀ {ass : vasgn} {x y : ℕ} {a b} {M:model} {φ}, 
-              M.satisfies' φ (ass.bind x a) →
-              M.satisfies' φ (ass.bind y b) →
-              M.satisfies' φ ((ass.bind x a).bind y b) :=
-    begin
-        intros ass x y a b M φ,-- h₁ h₂,
-        by_cases diff : x = y,
-            rw diff,
-            rw bind₂,
-            simp,
-        induction φ;
-        dunfold model.satisfies' vasgn.bind;
-        intros h₁ h₂,
-        swap,
-            contradiction,
-        all_goals{admit},
-        -- cases φ_n,
-        --     admit,
-        
-        -- convert h₂,
-        -- induction φ_n,
-        --     convert h₂,
-        --     ext z,
-        --     exact fin_zero_elim z,
-        -- induction φ_v z;
-        -- dunfold model.reference',
-            -- simp [h, bind₂],
-    end
-
 lemma bind₅ : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
@@ -484,9 +440,7 @@ lemma bind₅ : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
               :=
 begin
     intros M φ ass x a,
-    -- apply annoying;
-    -- revert h₁;
-    induction φ;
+    induction φ generalizing ass;
     dunfold uformula.free model.satisfies';
     simp;
     intros h₀,
@@ -495,8 +449,8 @@ begin
     obtain ⟨h₀, h₁⟩ := h₀,
     constructor;
     intros h₂ h₃;
-    have ih₁ := φ_ih_a h₀;
-    have ih₂ := φ_ih_a_1 h₁,
+    have ih₁ := @φ_ih_a ass h₀;
+    have ih₂ := @φ_ih_a_1 ass h₁,
         replace ih₁ := ih₁.2 h₃,
         apply ih₂.mp,
         exact h₂ ih₁,
@@ -539,24 +493,19 @@ begin
             rw bind₂,
             intro h₁,
             exact h₁,
-        have ih := φ_ih h,
-    },
-    swap,
-        have c := h₁ (ass φ_a),
-        rw bind at c,
-        replace ih := ih.2 c,
+        by_cases eq : x = φ_a,
+            specialize h₁ a₂,
+            revert h₁,
+            rw eq,
+            rw bind₂,
+            intro h₁,
+            exact h₁,
         specialize h₁ a₂,
-        exact bind₃ ih h₁,
-    have c := h₁ (ass.bind x a φ_a),
-    rw bind at c,
-    replace ih := ih.mp c,
-    specialize h₁ a₂,
-    -- set w := (vasgn.bind (vasgn.bind ass x a) φ_a a₂),
-    -- set g := (vasgn.bind ass x a),
-    -- set f := (vasgn.bind ass φ_a a₂),
-    -- simp [vasgn.bind] at *,
-    admit,
-
+    },
+        rw bind_symm eq at h₁,
+        exact (φ_ih h).mp h₁,
+    rw bind_symm eq,
+    exact (φ_ih h).2 h₁,
 end
 
 lemma fundamental : ∀ y x (M : model) ass, nat.abstract_in y Γ → 
@@ -572,147 +521,27 @@ begin
     exact (bind₅ h₁).2 h₂,
 end
 
--- lemma bind_rw : ∀ {M:model} {t₁ t₂ : term} x ass, M.reference' (t₁.rw x t₂) ass = M.reference' t₁ (ass.bind x (M.reference' t₂ ass)) :=
--- begin
---     intros M t₁ t₂ x ass,
---     induction t₁;
---     dunfold term.rw model.reference' vasgn.bind,
---         by_cases x = t₁;
---             simp [h],
---         dunfold model.reference',
---         replace h := ne.symm h,
---         simp [h],
---     simp,
---     cases t₁_n;
---         dunfold model.reference',
---         refl,
---     simp,
---     congr,
---     ext,
---     have ih := t₁_ih x_1,
-
--- end
-
--- lemma uformula.rw.semantics (φ : uformula) 
---                             (x : ℕ)
---                             (h₀ : x ∈ φ.free)
---                             (ass : vasgn)
---                             (M : model)
---                             (t : term)
---                             : 
---                             M.satisfies' φ ass →
---                             M.satisfies' (φ.rw x t)
---                             (ass.bind x (M.reference' t ass))
---                             :=
--- begin
---     -- intro h,
---     induction φ;
---     dunfold uformula.rw;
---     dunfold model.satisfies';
---     intro h,
---         convert h,
---         ext,
---         induction φ_v x_1;
---         dunfold term.rw model.reference',
---             by_cases hyp : x = a;
---                 simp [hyp],
---                 rw ←hyp,
--- end
-    -- have c₁ : (λ (m : fin φ_n), M.reference' (φ_v m) ass) = (flip M.reference' ass) ∘ φ_v,
-    --     dsimp [flip, function.comp],
-    --     refl,
---     -- have c : ∀ m, (M.reference' ((φ_v m).rw x t.val) (ass.bind x (M.reference' t.val ass))) = M.reference' (φ_v m) ass,
---     --     focus {
---     --         intro m,
---     --         induction (φ_v m);
---     --         dunfold term.rw;
---     --         dunfold vasgn.bind,
---     --         dunfold model.reference',
---     --         by_cases h₂ : x = a;
---     --             simp [h₂],
---     --             obtain ⟨t, pt₁, pt₂⟩ := t,
---     --             induction t,
---     --                 dunfold model.reference',
---     --                 simp,
-                
-    --             revert pt₁,
-    --             dunfold term.denotes,
-    --             dunfold term.vars,
-    --             simp,
-    --                 revert pt₂,
-    --                 dunfold term.concrete,
-    --                 contradiction,
-    --             simp,
-    --             induction t_n;
-    --             dunfold model.reference',
-                
-    --                 -- dunfold model.reference',
-
-    --     }
-
-            
-
--- end
-
-
--- lemma semantic_generalization : ∀ (M:model) x, M ⊨₁ φ → M ⊨₁ (uformula.for_all x φ) :=
---     begin
---         intros M x h₁,
---         dunfold model.satisfies model.satisfies',
---         intros _ _ asg _ _,
---         induction φ;
---         exact h₁ asg,
---     end
-
--- lemma semantic_generalization₂ : ∀ (M:model) x ass, x ∈ φ.free → M.satisfies' φ ass → M.satisfies' (uformula.for_all x φ) ass :=
---     begin
---         intros M x ass h₁ h₂ e asg h₃ h₄,
---         tactic.unfreeze_local_instances,
---         induction φ;
---         dunfold model.satisfies' uformula.free at *,
---     end
-
--- So pretty.
-
--- lemma universal_generalization : ∀ (M:model) (ass:vasgn) x y, M.satisfies' (uformula.rw φ x (term.var y)) ass → M.satisfies' (uformula.for_all x φ) ass :=
---     begin
---         intros M ass x y h₁ a asg h₂ h₃,
---         induction φ;
---         revert h₁;
---         dunfold uformula.rw model.satisfies';
---         -- try{simp};
---         intro h₁,
---             convert h₁,
---             ext,
---             induction φ_v x_1;
---                 dunfold term.rw model.reference',
---                 by_cases x = a_1;
---                 simp [h];
---                 dunfold model.reference',
---                     admit,
---                 replace h : a_1 ≠ x := ne.symm h,
---                 rw (h₃ a_1 h),
---             cases n;
---                 dunfold model.reference';
---                 simp,
---             congr,
---             ext,
---             exact ih x_2,
---         contradiction,
---             intros a ass h₄ h₅,
---             have sat := h₁ a ass h₄,
---             admit,
---         admit,
---     end
 
 lemma aux : ∀ {M:model} {ass:vasgn} {x t} {φ:uformula}, M.satisfies' (φ.rw x t) ass ↔ M.satisfies' φ (ass.bind x (M.reference' t ass)) :=
 begin
     intros M ass x t φ,
-    induction φ;
+    classical,
+    rename _inst_1 dont_annoy,
+    by_cases xf : x ∉ φ.free,
+        rw uformula_rw xf t,
+        simp[bind₅ xf],
+    simp at xf,
+    -- no more need for classical reasoning.
+    clear _inst,
+    revert xf,
+    induction φ generalizing ass;
     dunfold uformula.rw model.satisfies';
     try{simp};
-    constructor;
-    intro h,
+    intro xf,
+    focus {
+        constructor;
+        intro h,
+        all_goals{
         convert h,
         ext y,
         induction φ_v y;
@@ -724,10 +553,43 @@ begin
             dunfold model.reference',
             refl,
         simp,
-        cases n,
-
-
+        cases n;
+            dunfold model.reference';
+            simp,
+        congr,
+        ext z,
+        exact ih z,},
+    },
+    focus{
+        revert xf,
+        dunfold uformula.free,
+        simp_intros xf,
+        obtain ⟨xf₁, xf₂⟩ := xf,
+        replace xf₂ := ne.symm xf₂,
+        simp [xf₂],
+        constructor;
+        intros h a,
+            -- specialize h a,
+            -- -- simp [bind] at h,
+            -- have ih := (φ_ih xf₁).mp h,
+            -- rw bind_symm,
+            -- revert ih,
+            -- induction t;
+            -- dunfold model.reference' vasgn.bind;
+            -- intro ih,
+            admit,
+        set asg := ass.bind x (M.reference' t ass),
+        specialize h (asg φ_a),
+        simp [bind] at h,
+        have ih := (φ_ih xf₁).2 h,
+        admit,
+        
+        
+    },
+    admit,
 end
+
+-- So pretty.
 
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
 begin
@@ -742,9 +604,6 @@ begin
     -- case modus ponens
     have c₁ := entails_ih_h₁ ass h,
     have c₂ := entails_ih_h₂ ass h,
-    -- intro ass,
-    -- specialize c₁ ass,
-    -- specialize c₂ ass,
     revert c₁,
     dunfold model.satisfies',
     simp,
@@ -766,8 +625,6 @@ begin
     have ih := entails_ih (ass.bind entails_x x),
     apply ih,
     exact c,
-    -- exact universal_generalization entails_φ M ass entails_x entails_y_1 sat,
-
     -- case universal elim
     have ih := entails_ih ass h,
     clear entails_ih,
