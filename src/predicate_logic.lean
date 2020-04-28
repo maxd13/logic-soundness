@@ -279,7 +279,7 @@ inductive entails : set uformula → uformula → Prop
 | for_all_elim
             (Γ : set uformula) (φ : uformula)
             (x : ℕ) --(xf : x ∈ φ.free)
-            (t : term) --(den : t.denotes)
+            (t : term) (sub : φ.substitutable x t)
             (h : entails Γ (uformula.for_all x φ))
              : entails Γ (φ.rw x t)
 
