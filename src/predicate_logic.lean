@@ -12,13 +12,19 @@ universe u
 
 namespace logic
 
-open logic list tactic set
+open list tactic set
+
+structure signature :=
+    (functional_symbol : Type u)
+    (relational_symbol : Type u)
+    (arity : functional_symbol → ℕ)
+    (rarity : relational_symbol → ℕ)
 
 section formulas
 parameters {functional_symbol : Type u} [decidable_eq functional_symbol]
 parameter {relational_symbol : Type u}
-parameter {arity : functional_symbol -> ℕ}
-parameter {rarity : relational_symbol -> ℕ}
+parameter {arity : functional_symbol → ℕ}
+parameter {rarity : relational_symbol → ℕ}
 
 -- arity types
 def is_constant (f : functional_symbol) := arity f = 0
@@ -129,82 +135,82 @@ def subterms : set term → set term
 | S := ⋃ x ∈ S, term.subterms x
 
 -- formulas
-inductive uformula
-| relational {n : ℕ} (r : nrary n) (v : fin n → term) : uformula
-| false : uformula
-| for_all :  ℕ → uformula → uformula
-| if_then : uformula → uformula → uformula
+inductive formula
+| relational {n : ℕ} (r : nrary n) (v : fin n → term) : formula
+| false : formula
+| for_all :  ℕ → formula → formula
+| if_then : formula → formula → formula
 
-def uformula.not (φ) := uformula.if_then φ uformula.false
+def formula.not (φ) := formula.if_then φ formula.false
 
 reserve infixr ` ⇒ `:55
 class has_exp (α : Type u) := (exp : α → α → α)
 infixr ⇒ := has_exp.exp
 
-instance uformula.has_exp : has_exp uformula := ⟨uformula.if_then⟩
-local notation `∼` := uformula.not
+instance formula.has_exp : has_exp formula := ⟨formula.if_then⟩
+local notation `∼` := formula.not
 
-def uformula.rw : uformula → ℕ → term → uformula
-| (uformula.relational r v) x t :=
+def formula.rw : formula → ℕ → term → formula
+| (formula.relational r v) x t :=
     let v₂ := λ m, (v m).rw x t in
-    uformula.relational r v₂
-| (uformula.for_all y φ) x t :=
+    formula.relational r v₂
+| (formula.for_all y φ) x t :=
     let ψ := if y = x then φ else φ.rw x t in
-    uformula.for_all y ψ
-| (uformula.if_then φ ψ) x t := uformula.if_then (φ.rw x t) (ψ.rw x t)
+    formula.for_all y ψ
+| (formula.if_then φ ψ) x t := formula.if_then (φ.rw x t) (ψ.rw x t)
 | φ _ _ := φ
 
 -- free variables
-def uformula.free : uformula → set ℕ
-| (uformula.relational r v) := ⋃ m, (v m).vars
-| (uformula.for_all x φ) := φ.free - {x}
-| (uformula.if_then φ ψ) := φ.free ∪ ψ.free
+def formula.free : formula → set ℕ
+| (formula.relational r v) := ⋃ m, (v m).vars
+| (formula.for_all x φ) := φ.free - {x}
+| (formula.if_then φ ψ) := φ.free ∪ ψ.free
 | _ := ∅
 
-def uformula.substitutable  : uformula → ℕ → term → Prop
-| (uformula.relational r v) _ _ := true
-| uformula.false _ _ := true
-| (uformula.for_all y φ) x t := x ∉ (uformula.for_all y φ).free ∨
+def formula.substitutable  : formula → ℕ → term → Prop
+| (formula.relational r v) _ _ := true
+| formula.false _ _ := true
+| (formula.for_all y φ) x t := x ∉ (formula.for_all y φ).free ∨
                                 (y ∉ t.vars ∧ φ.substitutable x t) 
-| (uformula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
+| (formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
 
 -- open and closed formulas.
-def uformula.closed : uformula → Prop
+def formula.closed : formula → Prop
 | φ := φ.free = ∅
 
-def uformula.open : uformula → Prop
+def formula.open : formula → Prop
 | φ := ¬ φ.closed
 
-def uformula.vars : uformula → set ℕ
-| (uformula.for_all x φ) := φ.free ∪ {x}
-| (uformula.if_then φ ψ) := φ.vars ∪ ψ.vars
+def formula.vars : formula → set ℕ
+| (formula.for_all x φ) := φ.free ∪ {x}
+| (formula.if_then φ ψ) := φ.vars ∪ ψ.vars
 | φ := φ.free
 
-def uformula.terms : uformula → set term
-| (uformula.relational r v) := list.subterms (of_fn v)
-| (uformula.for_all x φ) := φ.terms ∪ {term.var x}
-| (uformula.if_then φ ψ) := φ.terms ∪ ψ.terms
+def formula.terms : formula → set term
+| (formula.relational r v) := list.subterms (of_fn v)
+| (formula.for_all x φ) := φ.terms ∪ {term.var x}
+| (formula.if_then φ ψ) := φ.terms ∪ ψ.terms
 | _ := ∅
 
-def term.abstract_in : term → set uformula → Prop
-| t S := t ∉ (⋃ φ ∈ S, uformula.terms φ)
+def term.abstract_in : term → set formula → Prop
+| t S := t ∉ (⋃ φ ∈ S, formula.terms φ)
 
 @[reducible]
-def nat.abstract_in : ℕ → set uformula → Prop
-| x S := x ∉ (⋃ φ ∈ S, uformula.free φ)
+def nat.abstract_in : ℕ → set formula → Prop
+| x S := x ∉ (⋃ φ ∈ S, formula.free φ)
 
 -- construct the generalization of a formula from a list of variables.
 -- This is just a fold but, I like being explicit in my folds when possible.
-def uformula.generalize : uformula → list ℕ → uformula
+def formula.generalize : formula → list ℕ → formula
 | φ [] := φ
-| φ (x::xs) := uformula.for_all x $ φ.generalize xs
+| φ (x::xs) := formula.for_all x $ φ.generalize xs
 
-theorem uformula_rw : ∀ {φ : uformula} {x : ℕ}, x ∉ φ.free → ∀(t : term),φ.rw x t = φ :=
+theorem formula_rw : ∀ {φ : formula} {x : ℕ}, x ∉ φ.free → ∀(t : term),φ.rw x t = φ :=
     begin
         intros φ x h t,
         revert h,
         induction φ;
-        dunfold uformula.free uformula.rw;
+        dunfold formula.free formula.rw;
         simp;
         intro h,
             ext y,
@@ -233,12 +239,12 @@ theorem uformula_rw : ∀ {φ : uformula} {x : ℕ}, x ∉ φ.free → ∀(t : t
             assumption,
     end
 
-lemma trivial_uformula_rw : ∀ {φ:uformula} {x}, φ.rw x (term.var x) = φ :=
+lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
     begin
         intros φ x,
         induction φ;
         -- tactic.unfreeze_local_instances,
-        dunfold uformula.rw;
+        dunfold formula.rw;
         try{simp},
         -- any_goals{assumption},
             -- convert h,
@@ -255,37 +261,37 @@ lemma trivial_uformula_rw : ∀ {φ:uformula} {x}, φ.rw x (term.var x) = φ :=
             simp [φ_ih_a, φ_ih_a_1],
     end
 
--- deductive consequence of uformulas: Γ ⊢ φ
-inductive entails : set uformula → uformula → Prop
-| reflexive (Γ : set uformula) (φ : uformula)(h : φ ∈ Γ) : entails Γ φ
-| transitivity (Γ Δ : set uformula) (φ : uformula)
+-- deductive consequence of formulas: Γ ⊢ φ
+inductive entails : set formula → formula → Prop
+| reflexive (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : entails Γ φ
+| transitivity (Γ Δ : set formula) (φ : formula)
                (h₁ : ∀ ψ ∈ Δ, entails Γ ψ)
                (h₂ : entails Δ φ) :  entails Γ φ
 | modus_ponens
-            (φ ψ : uformula) (Γ : set uformula)
+            (φ ψ : formula) (Γ : set formula)
             (h₁ : entails Γ (φ ⇒ ψ))
             (h₂ : entails Γ φ)
              : entails Γ ψ
 | intro
-            (φ ψ : uformula) (Γ : set uformula)
+            (φ ψ : formula) (Γ : set formula)
             (h : entails (Γ ∪ {φ}) ψ)
              : entails Γ (φ ⇒ ψ)
 | for_all_intro
-            (Γ : set uformula) (φ : uformula)
+            (Γ : set formula) (φ : formula)
             (x : ℕ) (xf : x ∈ φ.free)
             (abs : nat.abstract_in x Γ)
             (h : entails Γ φ)
-             : entails Γ (uformula.for_all x φ)
+             : entails Γ (formula.for_all x φ)
 | for_all_elim
-            (Γ : set uformula) (φ : uformula)
+            (Γ : set formula) (φ : formula)
             (x : ℕ) --(xf : x ∈ φ.free)
             (t : term) (sub : φ.substitutable x t)
-            (h : entails Γ (uformula.for_all x φ))
+            (h : entails Γ (formula.for_all x φ))
              : entails Γ (φ.rw x t)
 
 local infixr `⊢`:55 := entails
 
-variables (Γ : set uformula) (φ : uformula)
+variables (Γ : set formula) (φ : formula)
 
 theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
 begin
@@ -294,7 +300,7 @@ begin
     simp
 end
 
-variables (Δ : set uformula) (ψ : uformula)
+variables (Δ : set formula) (ψ : formula)
 
 theorem monotonicity : Δ ⊆ Γ → Δ ⊢ ψ → Γ ⊢ ψ :=
 begin
@@ -366,27 +372,27 @@ def model.reference (M : model) : pterm → α :=
 def vasgn.bind (ass : vasgn) (x : ℕ) (val : α) : vasgn :=
     λy, if y = x then val else ass y
 
-def model.satisfies' : model → uformula → vasgn → Prop
-| M (uformula.relational r v) asg := 
+def model.satisfies' : model → formula → vasgn → Prop
+| M (formula.relational r v) asg := 
           M.I₂ r $ λm,  M.reference' (v m) asg
-| M uformula.false _ := false
-| M (uformula.for_all x φ) ass :=
+| M formula.false _ := false
+| M (formula.for_all x φ) ass :=
     ∀ (a : α),
     M.satisfies' φ (ass.bind x a)
-| M (uformula.if_then φ ψ) asg :=
+| M (formula.if_then φ ψ) asg :=
     let x := model.satisfies' M φ asg,
         y := model.satisfies' M ψ asg
     in x → y
 
 
 @[reducible]
-def model.satisfies : model → uformula → Prop
+def model.satisfies : model → formula → Prop
 | M φ := ∀ (ass : vasgn), M.satisfies' φ ass
 
 local infixr `⊨₁`:55 := model.satisfies
 local infixr `⊢`:55 := entails
 
-lemma false_is_unsat : ¬∃ M : model, M ⊨₁ uformula.false :=
+lemma false_is_unsat : ¬∃ M : model, M ⊨₁ formula.false :=
 begin
     intro h,
     obtain ⟨M, h⟩ := h,
@@ -395,7 +401,7 @@ begin
     exact h (λ_, x),
 end
 
-def model.for : model → set uformula → Prop
+def model.for : model → set formula → Prop
 | M Γ := ∀ φ ∈ Γ, M ⊨₁ φ
 
 -- semantic consequence
@@ -433,7 +439,7 @@ lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass
         simp[h],
     end
 
-lemma bind₅ : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
+lemma bind₅ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
@@ -441,7 +447,7 @@ lemma bind₅ : ∀ {M:model} {φ:uformula}{ass : vasgn}{x : ℕ}{a},
 begin
     intros M φ ass x a,
     induction φ generalizing ass;
-    dunfold uformula.free model.satisfies';
+    dunfold formula.free model.satisfies';
     simp;
     intros h₀,
     swap 3,
@@ -522,20 +528,20 @@ begin
 end
 
 
-lemma aux : ∀ {M:model} {ass:vasgn} {x t} {φ:uformula}, M.satisfies' (φ.rw x t) ass ↔ M.satisfies' φ (ass.bind x (M.reference' t ass)) :=
+lemma aux : ∀ {M:model} {ass:vasgn} {x t} {φ:formula}, M.satisfies' (φ.rw x t) ass ↔ M.satisfies' φ (ass.bind x (M.reference' t ass)) :=
 begin
     intros M ass x t φ,
     classical,
     rename _inst_1 dont_annoy,
     by_cases xf : x ∉ φ.free,
-        rw uformula_rw xf t,
+        rw formula_rw xf t,
         simp[bind₅ xf],
     simp at xf,
     -- no more need for classical reasoning.
     clear _inst,
     revert xf,
     induction φ generalizing ass;
-    dunfold uformula.rw model.satisfies';
+    dunfold formula.rw model.satisfies';
     try{simp};
     intro xf,
     focus {
@@ -562,7 +568,7 @@ begin
     },
     focus{
         revert xf,
-        dunfold uformula.free,
+        dunfold formula.free,
         simp_intros xf,
         obtain ⟨xf₁, xf₂⟩ := xf,
         replace xf₂ := ne.symm xf₂,
@@ -635,7 +641,7 @@ begin
     specialize ih ref,
     exact aux.2 ih,
     -- induction entails_φ generalizing ass;
-    -- dunfold uformula.rw model.satisfies';
+    -- dunfold formula.rw model.satisfies';
     -- intro ih,
     --     convert ih (M.reference' entails_t ass),
     --     ext y,
@@ -695,7 +701,7 @@ begin
                 
     -- --         },
     -- --     revert sat;
-    -- --     dunfold uformula.rw;
+    -- --     dunfold formula.rw;
     -- --     dunfold model.satisfies';
     -- --     try{simp},
     -- --         intro sat,
@@ -706,7 +712,7 @@ begin
     -- --     induction entails_φ;
     -- --     have sat := entails_ih h;
     -- --     revert sat;
-    -- --     dunfold uformula.rw; try{simp},
+    -- --     dunfold formula.rw; try{simp},
     -- --     -- I cant go any further applying strategies to
     -- --     -- all goals because the linter gets very slow.
     -- --     dunfold model.satisfies', try{simp},
