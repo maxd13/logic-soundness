@@ -78,15 +78,17 @@
 
 The advent of intuitionistic dependent type theories allowed the development of proof assistants for the formalization and computer-aided verification of mathematical proofs. These interactive proof systems allow the experienced user to prove just about any true theorem of mathematics which is at least already suspected in the literature to be true.
 
-&emsp; &emsp; As explained in Martin-Löf's paper [1], by applying the Curry-Howard isomorphism between proofs in intuitionistic logic and terms in a typed lambda calculus, we can see any flavour of intuitionistic type theory to be a programming language whose programs are mathematical proofs. The Lean ITP, developed by Leonardo de Moura at Microsoft Research, is such a programming language: implementing intuitionistic type theory and the calculus of inductive constructions, Lean allows for the development of complex proofs in all areas of mathematics in a way that resembles the more familiar forms of software production. By default, Lean allows for the construction of proofs in intuitionistic logic, but by the declaration of (the non-intuitionistic version of) the axiom of choice as an extra axiom of the theory, it also allows for classical reasoning to take place. Since intuitionistic type theory with the axiom of choice is at least as expressive as classical ZFC set theory, it is very much well suited for use as a meta-language for the development of semantics for logical calculi. In fact the community-developed standard library [2] for the Lean prover already implements an internal model of ZFC within Lean:
+&emsp; &emsp; As explained in Martin-Löf's paper [1], by applying the Curry-Howard isomorphism [2] between proofs in intuitionistic logic and terms in a typed lambda calculus, we can see any flavour of intuitionistic type theory to be a programming language whose programs are mathematical proofs. The Lean ITP, developed by Leonardo de Moura at Microsoft Research, is such a programming language: implementing intuitionistic type theory and the calculus of inductive constructions, Lean supports the engineering of complex proofs in all areas of mathematics in a way that resembles the more familiar forms of software development. By default, Lean allows for the construction of proofs in intuitionistic logic, but by the declaration of (the non-intuitionistic version of) the axiom of choice as an extra assumption of the theory, it also allows classical reasoning to take place. Since intuitionistic type theory with the axiom of choice is at least as expressive as classical ZFC set theory, it is very much well suited for use as a meta-language for the development of semantics for logical calculi. In fact the community-developed standard library [3] for the Lean prover implements an internal model of ZFC within Lean:
 
 ```haskell
 -- The ZFC universe of sets consists of the type of pre-sets,
 -- quotiented by extensional equivalence.
 def Set : Type (u+1) := quotient pSet.setoid.{u}
 ```
+<!-- 
+&emsp; &emsp; This goes to show not only that Lean is at least as expressive as ZFC, but also the consistency of ZFC relative to Lean.  -->
 
-&emsp; &emsp; This goes to show not only that Lean is at least as expressive as ZFC, but also the consistency of ZFC relative to Lean. In this paper we implemented first-order logic as an internal embedded language of Lean and used Lean structures to give model-theoretic semantics to the logical calculus. This allowed us to derive the consistency of the calculus, and opens up the way for future work in this area.
+&emsp; &emsp; In this paper we implemented first-order logic as an internal embedded language of Lean and used Lean structures to give model-theoretic semantics to the logical calculus. This allowed us to derive meta-theorems about the calculus, such as its soundness, and opens up the way for future investigations.
 
 <!-- We can then use types in Lean in a manner similar as to how we use sets in ZFC to provide semantics for formal languages. -->
 
@@ -363,7 +365,7 @@ def rint {n : ℕ} := nrary n → (fin n → α) → Prop
 def vasgn := ℕ → α
 ```
 <!-- <div style="page-break-before: always;"> -->
-&emsp; &emsp; It is then trivial to define a structure for the language, which we call a model:
+&emsp; &emsp; It is then trivial to define a structure for the language. Now since the term `structure` is a reserved word in Lean, we use a synonym for that word in our definitions, and call it simply a model: 
 <!-- </div> -->
 
 ```haskell
@@ -371,6 +373,8 @@ structure model :=
     (I₁ : Π {n}, @fint n)
     (I₂ : Π {n}, @rint n)
 ```
+
+&emsp; &emsp; Even though a first-order structure in logic is only considered to be a model relative to a particular formula, or set of formulas, which it satisfies, we take the two words to be synonymous; since every structure is a model of some formula or another.
 
 &emsp; &emsp; We then define references for terms in the language, and a way to bind a variable to a reference in a variable assignment:
 
@@ -410,7 +414,7 @@ local infixr `⊨₁`:55 := model.satisfies
 
 ```
 
-&emsp; &emsp; We have chosen to follow the pattern that the functions defined with a `'` depend on a choice of assignment, while the ones without it do not. Finally, we define the notion of a formula being a semantic consequence of a set of formulas:
+&emsp; &emsp; We have chosen to follow the convention that the functions defined with a `'` depend on a choice of assignment, while the ones without it do not. Finally, we define the notion of a formula being a semantic consequence of a set of formulas:
 
 ```haskell
 def theory.follows (Γ : set formula) (φ : formula): Prop :=
@@ -461,20 +465,21 @@ lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
                      := ...
 ```
 
-&emsp; &emsp; We will not reproduce the proof here for lack of space. Furthermore, many references [7] already exist for an outline of how this sort of proof works. Suffices to say that the proof proceeds by induction on all possible ways that the set of formulas $\Gamma$ could prove the formula $\varphi$, by showing essentially that all logical rules preserve the validity of formulas. As a corollary we can conclude that the empty set of formulas is consistent:
+&emsp; &emsp; We will not reproduce the proof here for lack of space. Furthermore, many references [7] already exist for an outline of how this sort of proof works. Suffices to say that the proof proceeds by induction on all possible ways that the set of formulas $\Gamma$ could prove the formula $\varphi$, by showing essentially that all logical rules preserve the validity of formulas. As a corollary we can conclude the consistency of the logical calculus by proving that the empty set of formulas does not derive `formula.false`:
 
 ```haskell
+def consistent (Γ : set formula) := ¬ Γ ⊢ formula.false
 theorem consistency : consistent ∅ := ...
 ```
 
-&emsp; &emsp; The proof works by constructing some model $M$, which is trivial to do, and then this will be a model of the empty set. It follows by soundness that if `formula.false` could be proven from $\empty$, then $M$ would satisfy `formula.false`, but since no model can do that, we have that $\empty$ does not prove `formula.false`.
+&emsp; &emsp; The proof works by constructing some structure $M$, which is then a model of the empty set. It follows by soundness that if `formula.false` could be proven from $\empty$, then $M$ would satisfy `formula.false`. Since no structure can do that, we have that $\empty$ does not prove `formula.false`.
 
 <!-- ### **The Logic of the Proof.**
 - Talk about how the soundness proof uses the lemmas. Give the statement of the lemmas and discuss in outline how they are used in the proof, but do not show proof the proof itself of either the lemmas nor of soundness. -->
 
 ## **Conclusion**
 
-We have summarized our implementation of the soundness proof, many more details could still be given about how the proofs were constructed, and the difficulties which lied therein. Our work still gives many opportunities for expansion. Another simple corollary we could derive would be the consistency of arithmetic, by showing that the natural numbers are a model of the Peano axioms. Another more laborious extension would be the completeness proof of classical predicate logic. For more practical utility, we could extend the syntax of the system to include Hoare triples and exemplify the application of Hoare logic to the formal verification of a particular algorithm in Lean. There is still much in store for the future.
+We have summarized our implementation of the soundness proof, many more details could still be given about how the proofs were constructed, and the difficulties which lied therein. Our work still gives many opportunities for expansion, as one obvious yet much more laborious development would be the formalization of the completeness proof of classical predicate logic. For more practical utility, we could extend the syntax of the system to include Hoare triples and exemplify the application of Hoare logic to the formal verification of a particular algorithm in Lean. There is still much in store for the future.
 
 <!-- - Talk about how this work immediately opens up the possibility of proving the consistency of arithmetic by using the natural numbers as a model, and also of proving completeness.
 - Talk about a future internalized (deep embedding) implementation of Hoare logic and how it could be used for program verification. -->
@@ -485,10 +490,10 @@ We have summarized our implementation of the soundness proof, many more details 
 &emsp; &emsp; Proceedings of the 1979 international congress at Hannover, Germany, L.J. Cohen, J. Los, H. Pfeiffer and  
 &emsp; &emsp; K.-P. Podewski (eds). Amsterdam: North- Holland Publishing Company, pp. 153–175.
 
+[2] 1958, "Combinatory Logic", Curry, Haskell B. and Robert Feys, Amsterdam: North-Holland.
+
 [2] 2020, "The lean mathematical library", in Proceedings of the 9th ACM SIGPLAN International Conference on  
     &emsp; &emsp; Certified Programs and Proofs, The mathlib Community, ACM.
-
-[3] 1958, "Combinatory Logic", Curry, Haskell B. and Robert Feys, Amsterdam: North-Holland.  
 
 [4] 2017, Logic and Proof, Jeremy Avigad, Robert Y. Lewis, and Floris van Doorn,  
     &emsp; &emsp; https://leanprover.github.io/logic_and_proof/ (accessed in 4/29/2020).
@@ -496,8 +501,8 @@ We have summarized our implementation of the soundness proof, many more details 
 [5] 2019, "A formalization of forcing and the unprovability of the continuum hypothesis", Jesse Michael Han and   
     &emsp; &emsp; Floris van Doorn.
 
-[6] 1969, "An Axiomatic Basis for Computer Programming", The Queen's University of Belfast,* Northen Ireland,  
-    &emsp; &emsp; C.A.R. Hoare.
+[6] 1969, "An Axiomatic Basis for Computer Programming", The Queen's University of Belfast, Departament of  
+    &emsp; &emsp; Computer Science Northen Ireland, C.A.R. Hoare.
 
 [7] 1972, "A Mathematical Introduction to Logic", Herbert B. Enderton.
 
