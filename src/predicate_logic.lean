@@ -21,7 +21,7 @@ structure signature :=
     (rarity : relational_symbol → ℕ)
 
 section formulas
-parameters {functional_symbol : Type u} [decidable_eq functional_symbol]
+parameters {functional_symbol : Type u}
 parameter {relational_symbol : Type u}
 parameter {arity : functional_symbol → ℕ}
 parameter {rarity : relational_symbol → ℕ}
@@ -49,13 +49,6 @@ def term.rw : term → ℕ → term → term
     let v₂ := λ m, term.rw (v m) x t in
     term.app f v₂
 
-def term.rw_const : term → const → ℕ → term
-| (@term.app _ _ _  0 f _) c x := if f = c then term.var x else f.term
-| (@term.app _ _ _ (n+1) f v) c x := 
-    let v₂ := λ m, term.rw_const (v m) c x in
-    term.app f v₂
-| t _ _ := t
-
 def term.vars : term → set ℕ
 | (term.var a) := {a}
 | (term.app f v) :=
@@ -72,11 +65,11 @@ def pterm := subtype {t : term | t.denotes}-- ∧ t.concrete}
 def expression := subtype {t : term | t.conotes}-- ∧ t.concrete}
 -- def cterm := subtype term.concrete
 
--- theorem aux_rw : ∀ (t₁ t₂ : term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
---     sorry
+theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
+    sorry
 
--- theorem trivial_rw : ∀ (t:term) (x), t.rw x (term.var x) = t :=
---     sorry
+theorem trivial_rw : ∀ (t:term) (x), t.rw x (term.var x) = t :=
+    sorry
 
 theorem den_rw : ∀ (t₁ t₂ : term) (x : ℕ), t₁.denotes → t₁.rw x t₂ = t₁ :=
 begin
@@ -137,18 +130,23 @@ def subterms : set term → set term
 -- formulas
 inductive formula
 | relational {n : ℕ} (r : nrary n) (v : fin n → term) : formula
-| false : formula
 | for_all :  ℕ → formula → formula
 | if_then : formula → formula → formula
-
-def formula.not (φ) := formula.if_then φ formula.false
+| equation (t₁ t₂ : term) : formula
+| false : formula
 
 reserve infixr ` ⇒ `:55
 class has_exp (α : Type u) := (exp : α → α → α)
 infixr ⇒ := has_exp.exp
 
 instance formula.has_exp : has_exp formula := ⟨formula.if_then⟩
-local notation `∼` := formula.not
+
+def formula.not (φ : formula)   := φ ⇒ formula.false
+def formula.or  (φ ψ : formula) := φ.not ⇒ ψ
+def formula.and (φ ψ : formula) := (φ.not.or ψ.not).not
+def formula.iff (φ ψ : formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
+
+-- local notation `∼` := formula.not
 
 def formula.rw : formula → ℕ → term → formula
 | (formula.relational r v) x t :=
@@ -157,7 +155,8 @@ def formula.rw : formula → ℕ → term → formula
 | (formula.for_all y φ) x t :=
     let ψ := if y = x then φ else φ.rw x t in
     formula.for_all y ψ
-| (formula.if_then φ ψ) x t := formula.if_then (φ.rw x t) (ψ.rw x t)
+| (formula.if_then φ ψ) x t := (φ.rw x t) ⇒ (ψ.rw x t)
+| (formula.equation t₁ t₂) x t := formula.equation (t₁.rw x t) (t₂.rw x t)
 | φ _ _ := φ
 
 -- free variables
@@ -165,14 +164,14 @@ def formula.free : formula → set ℕ
 | (formula.relational r v) := ⋃ m, (v m).vars
 | (formula.for_all x φ) := φ.free - {x}
 | (formula.if_then φ ψ) := φ.free ∪ ψ.free
-| _ := ∅
+| (formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
+| formula.false := ∅
 
 def formula.substitutable  : formula → ℕ → term → Prop
-| (formula.relational r v) _ _ := true
-| formula.false _ _ := true
 | (formula.for_all y φ) x t := x ∉ (formula.for_all y φ).free ∨
                                 (y ∉ t.vars ∧ φ.substitutable x t) 
 | (formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
+| _ _ _ := true
 
 -- open and closed formulas.
 def formula.closed : formula → Prop
@@ -196,7 +195,7 @@ def term.abstract_in : term → set formula → Prop
 | t S := t ∉ (⋃ φ ∈ S, formula.terms φ)
 
 @[reducible]
-def nat.abstract_in : ℕ → set formula → Prop
+def abstract_in : ℕ → set formula → Prop
 | x S := x ∉ (⋃ φ ∈ S, formula.free φ)
 
 -- construct the generalization of a formula from a list of variables.
@@ -226,17 +225,23 @@ theorem formula_rw : ∀ {φ : formula} {x : ℕ}, x ∉ φ.free → ∀(t : ter
             specialize ih z,
             exact ih h,
         classical,
-        rename _inst_1 dont_annoy,
+        -- rename _inst_1 dont_annoy,
         by_cases eq₁ : x ∈ φ_a_1.free,
             simp [h eq₁],
         by_cases eq₂ : φ_a = x;
             simp [eq₂],
         exact φ_ih eq₁,
+        all_goals{
             push_neg at h,
             obtain ⟨h₁, h₂⟩ := h,
-            constructor;
-            apply_assumption;
-            assumption,
+        },  
+            replace h₁ := φ_ih_a h₁,
+            replace h₂ := φ_ih_a_1 h₂,
+            rw [h₁, h₂],
+            refl,
+        constructor;
+        apply rw_eq_of_not_in_vars;
+        assumption,
     end
 
 lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
@@ -259,11 +264,15 @@ lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
         rw φ_ih,
         simp,
             simp [φ_ih_a, φ_ih_a_1],
+            refl,
+        constructor;
+        apply trivial_rw;
+        assumption,
     end
 
 -- deductive consequence of formulas: Γ ⊢ φ
 inductive entails : set formula → formula → Prop
-| reflexive (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : entails Γ φ
+| reflexivity (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : entails Γ φ
 | transitivity (Γ Δ : set formula) (φ : formula)
                (h₁ : ∀ ψ ∈ Δ, entails Γ ψ)
                (h₂ : entails Δ φ) :  entails Γ φ
@@ -279,7 +288,7 @@ inductive entails : set formula → formula → Prop
 | for_all_intro
             (Γ : set formula) (φ : formula)
             (x : ℕ) (xf : x ∈ φ.free)
-            (abs : nat.abstract_in x Γ)
+            (abs : abstract_in x Γ)
             (h : entails Γ φ)
              : entails Γ (formula.for_all x φ)
 | for_all_elim
@@ -288,30 +297,54 @@ inductive entails : set formula → formula → Prop
             (t : term) (sub : φ.substitutable x t)
             (h : entails Γ (formula.for_all x φ))
              : entails Γ (φ.rw x t)
+| exfalso (Γ : set formula) (φ : formula)
+          (h : entails Γ formula.false)
+          : entails Γ φ
+| by_contradiction (Γ : set formula) (φ : formula)
+                   (h : entails Γ φ.not.not)
+                   : entails Γ φ
+| identity_intro
+            (Γ : set formula) (t : term)
+             : entails Γ (formula.equation t t)
+| identity_elim 
+            (Γ : set formula) (φ : formula)
+            (x : ℕ) (xf : x ∈ φ.free)
+            (t₁ t₂: term)
+            (sub₁ : φ.substitutable x t₁)
+            (sub₂ : φ.substitutable x t₂)
+            (h : entails Γ (φ.rw x t₁))
+            (eq : entails Γ (formula.equation t₁ t₂))
+             : entails Γ (φ.rw x t₂)
 
 local infixr `⊢`:55 := entails
 
-variables (Γ : set formula) (φ : formula)
+variables (Γ Δ : set formula) (φ : formula)
 
 theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
 begin
     apply entails.intro,
-    apply entails.reflexive (Γ∪{φ}) φ,
+    apply entails.reflexivity (Γ∪{φ}) φ,
     simp
 end
 
-variables (Δ : set formula) (ψ : formula)
-
-theorem monotonicity : Δ ⊆ Γ → Δ ⊢ ψ → Γ ⊢ ψ :=
+theorem monotonicity : Δ ⊆ Γ → Δ ⊢ φ → Γ ⊢ φ :=
 begin
     intros H h,
-    have c₁ : ∀ φ ∈ Δ, entails Γ φ,
-        intros φ hφ,
-        apply entails.reflexive Γ φ,
-        exact H hφ,
+    have c₁ : ∀ ψ ∈ Δ, entails Γ ψ,
+        intros ψ hψ,
+        apply entails.reflexivity Γ ψ,
+        exact H hψ,
     apply entails.transitivity;
     assumption,
-end
+end 
+
+-- Doesn't need to be defined just for theories
+def consistent (Γ : set formula) := ¬ Γ ⊢ formula.false
+
+-- At any rate we can define it for theories as well.
+def theory := subtype {Γ : set formula | ∀ φ, Γ ⊢ φ → φ ∈ Γ}
+
+def theory.consistent (Γ : theory) := consistent Γ.val
 
 section semantics
 
@@ -333,9 +366,9 @@ structure model :=
 -- @[reducible]
 def model.reference' (M : model) : term → vasgn → α
 | (term.var x) asg := asg x
-| (@term.app _ _ _  0 f _) _ := model.I₁ M f fin_zero_elim
-| (@term.app _ _ _  (n+1) f v) asg := let v₂ := λ k, model.reference' (v k) asg
-                                             in model.I₁ M f v₂
+| (@term.app _ _  0 f _) _ := model.I₁ M f fin_zero_elim
+| (@term.app _ _  (n+1) f v) asg := let v₂ := λ k, model.reference' (v k) asg
+                                    in model.I₁ M f v₂
 
 def model.reference (M : model) : pterm → α :=
     begin
@@ -375,14 +408,17 @@ def vasgn.bind (ass : vasgn) (x : ℕ) (val : α) : vasgn :=
 def model.satisfies' : model → formula → vasgn → Prop
 | M (formula.relational r v) asg := 
           M.I₂ r $ λm,  M.reference' (v m) asg
-| M formula.false _ := false
 | M (formula.for_all x φ) ass :=
-    ∀ (a : α),
-    M.satisfies' φ (ass.bind x a)
+    ∀ (a : α), M.satisfies' φ (ass.bind x a)
 | M (formula.if_then φ ψ) asg :=
-    let x := model.satisfies' M φ asg,
-        y := model.satisfies' M ψ asg
+    let x := M.satisfies' φ asg,
+        y := M.satisfies' ψ asg
     in x → y
+| M (formula.equation t₁ t₂) asg := 
+    let x := M.reference' t₁ asg,
+        y := M.reference' t₂ asg
+    in x = y
+| M formula.false _ := false
 
 
 @[reducible]
@@ -390,13 +426,13 @@ def model.satisfies : model → formula → Prop
 | M φ := ∀ (ass : vasgn), M.satisfies' φ ass
 
 local infixr `⊨₁`:55 := model.satisfies
-local infixr `⊢`:55 := entails
+-- local infixr `⊢`:55 := entails
 
 lemma false_is_unsat : ¬∃ M : model, M ⊨₁ formula.false :=
 begin
     intro h,
     obtain ⟨M, h⟩ := h,
-    apply nonempty.elim _inst_2,
+    apply nonempty.elim _inst_1,
     intro x,
     exact h (λ_, x),
 end
@@ -421,7 +457,7 @@ lemma bind_symm : ∀ {ass : vasgn} {x y : ℕ} {a b}, x ≠ y → (ass.bind x a
             simp[eq, h],
     end
 
-lemma bind : ∀ {ass : vasgn} {x : ℕ}, ass.bind x (ass x) = ass :=
+lemma bind₁ : ∀ {ass : vasgn} {x : ℕ}, ass.bind x (ass x) = ass :=
     begin
         intros ass x,
         simp [vasgn.bind],
@@ -439,7 +475,17 @@ lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass
         simp[h],
     end
 
-lemma bind₅ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
+lemma bind_term : ∀ {M:model} {ass :vasgn} {x : ℕ} {t₁ t₂ : term} {a},
+                  x ∉ t₁.vars → x ∉ t₂.vars →
+                  ((M.reference' t₁ (vasgn.bind ass x a) =
+                  M.reference' t₂ (vasgn.bind ass x a)) ↔
+                  (M.reference' t₁ ass =
+                  M.reference' t₂ ass)) :=
+begin
+    admit,
+end
+
+lemma bind₃ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
@@ -490,7 +536,7 @@ begin
     intro h₁;
     intro a₂;
     classical;
-    rename _inst_1 dont_annoy,
+    -- rename _inst_1 dont_annoy,
     all_goals{
         by_cases (x ∈ φ_a_1.free),
             specialize h₁ a₂,
@@ -512,96 +558,102 @@ begin
         exact (φ_ih h).mp h₁,
     rw bind_symm eq,
     exact (φ_ih h).2 h₁,
+        push_neg at h₀,
+        obtain ⟨h₀, h₁⟩ := h₀,
+        exact bind_term h₀ h₁,
 end
 
-lemma fundamental : ∀ y x (M : model) ass, nat.abstract_in y Γ → 
+lemma fundamental : ∀ y x (M : model) ass, abstract_in y Γ → 
             (∀ φ ∈ Γ, M.satisfies' φ ass) →
             ( ∀φ ∈ Γ, M.satisfies' φ (ass.bind y x))
             :=
         
 begin
     intros y x M ass h₁ h₂ φ H,
-    simp [nat.abstract_in] at h₁,
+    simp [abstract_in] at h₁,
     specialize h₁ φ H,
     specialize h₂ φ H,
-    exact (bind₅ h₁).2 h₂,
+    exact (bind₃ h₁).2 h₂,
 end
 
 
-lemma aux : ∀ {M:model} {ass:vasgn} {x t} {φ:formula}, M.satisfies' (φ.rw x t) ass ↔ M.satisfies' φ (ass.bind x (M.reference' t ass)) :=
+lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
+                     φ.substitutable x t →
+                     (M.satisfies' (φ.rw x t) ass ↔
+                     M.satisfies' φ (ass.bind x (M.reference' t ass))) 
+                     :=
 begin
-    intros M ass x t φ,
-    classical,
-    rename _inst_1 dont_annoy,
-    by_cases xf : x ∉ φ.free,
-        rw formula_rw xf t,
-        simp[bind₅ xf],
-    simp at xf,
-    -- no more need for classical reasoning.
-    clear _inst,
-    revert xf,
-    induction φ generalizing ass;
-    dunfold formula.rw model.satisfies';
-    try{simp};
-    intro xf,
-    focus {
-        constructor;
-        intro h,
-        all_goals{
-        convert h,
-        ext y,
-        induction φ_v y;
-        dunfold term.rw model.reference' vasgn.bind,
-            by_cases eq : a = x;
-                simp [eq],
-            replace eq := ne.symm eq,
-            simp [eq],
-            dunfold model.reference',
-            refl,
-        simp,
-        cases n;
-            dunfold model.reference';
-            simp,
-        congr,
-        ext z,
-        exact ih z,},
-    },
-    focus{
-        revert xf,
-        dunfold formula.free,
-        simp_intros xf,
-        obtain ⟨xf₁, xf₂⟩ := xf,
-        replace xf₂ := ne.symm xf₂,
-        simp [xf₂],
-        constructor;
-        intros h a,
-            -- specialize h a,
-            -- -- simp [bind] at h,
-            -- have ih := (φ_ih xf₁).mp h,
-            -- rw bind_symm,
-            -- revert ih,
-            -- induction t;
-            -- dunfold model.reference' vasgn.bind;
-            -- intro ih,
-            admit,
-        set asg := ass.bind x (M.reference' t ass),
-        specialize h (asg φ_a),
-        simp [bind] at h,
-        have ih := (φ_ih xf₁).2 h,
-        admit,
+    -- intros M ass x t φ,
+    -- classical,
+    -- -- rename _inst_1 dont_annoy,
+    -- by_cases xf : x ∉ φ.free,
+    --     rw formula_rw xf t,
+    --     simp[bind₃ xf],
+    -- simp at xf,
+    -- -- no more need for classical reasoning.
+    -- clear _inst,
+    -- revert xf,
+    -- induction φ generalizing ass;
+    -- dunfold formula.rw model.satisfies';
+    -- try{simp};
+    -- intro xf,
+    -- focus {
+    --     constructor;
+    --     intro h,
+    --     all_goals{
+    --     convert h,
+    --     ext y,
+    --     induction φ_v y;
+    --     dunfold term.rw model.reference' vasgn.bind,
+    --         by_cases eq : a = x;
+    --             simp [eq],
+    --         replace eq := ne.symm eq,
+    --         simp [eq],
+    --         dunfold model.reference',
+    --         refl,
+    --     simp,
+    --     cases n;
+    --         dunfold model.reference';
+    --         simp,
+    --     congr,
+    --     ext z,
+    --     exact ih z,},
+    -- },
+    -- focus{
+    --     revert xf,
+    --     dunfold formula.free,
+    --     simp_intros xf,
+    --     obtain ⟨xf₁, xf₂⟩ := xf,
+    --     replace xf₂ := ne.symm xf₂,
+    --     simp [xf₂],
+    --     constructor;
+    --     intros h a,
+    --         -- specialize h a,
+    --         -- -- simp [bind] at h,
+    --         -- have ih := (φ_ih xf₁).mp h,
+    --         -- rw bind_symm,
+    --         -- revert ih,
+    --         -- induction t;
+    --         -- dunfold model.reference' vasgn.bind;
+    --         -- intro ih,
+    --         admit,
+    --     set asg := ass.bind x (M.reference' t ass),
+    --     specialize h (asg φ_a),
+    --     simp [bind] at h,
+    --     have ih := (φ_ih xf₁).2 h,
+    --     admit,
         
         
-    },
+    -- },
     admit,
 end
 
 -- So pretty.
-
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
 begin
     intros entails M ass h,
     induction entails generalizing ass,
-    -- case reflexive
+    -- case reflexivity
     exact h entails_φ entails_h,
     -- case transitivity
     apply entails_ih_h₂,
@@ -633,95 +685,63 @@ begin
     exact c,
     -- case universal elim
     have ih := entails_ih ass h,
+    rename entails_sub sub,
     clear entails_ih,
     revert ih,
     dunfold model.satisfies',
     intro ih,
     set ref := M.reference' entails_t ass,
     specialize ih ref,
-    exact aux.2 ih,
-    -- induction entails_φ generalizing ass;
-    -- dunfold formula.rw model.satisfies';
-    -- intro ih,
-    --     convert ih (M.reference' entails_t ass),
-    --     ext y,
-    --     induction entails_φ_v y;
-    --     dunfold term.rw model.reference',
-    --         by_cases entails_x = a;
-    --             simp [vasgn.bind, h],
-    --         dunfold model.reference',
-    --         replace h := ne.symm h,
-    --         simp [h],
-    --     cases n;
-    --         dunfold model.reference',
-    --         refl,
-    --     simp at *,
-    --     congr,
-    --     ext z,
-    --     exact ih_1 z,
-    -- tactic.unfreeze_local_instances,
-    -- obtain ⟨x⟩ := _inst_2,
-    -- exact ih x,
-    --     intro a,
-    --     by_cases eq : entails_φ_a = entails_x;
-    --         simp[eq],
-    --         specialize ih (ass entails_x) a,
-    --         simp [eq, bind₂] at ih,
-    --         exact ih,
-    --     -- here we will need the fundamental lemma
-    --     admit,
-    -- simp at *,
-    --         -- simp [ne.symm, h],
-    -- -- clear h,
-    -- -- clear entails_ih,
-    
-    -- -- revert ass,
-    -- -- exact semantic_generalization φ M entails_x sat,
-    -- -- tactic.unfreeze_local_instances,
-    -- -- dunfold nat.abstract_in at *,
-    -- -- revert asg,
-    -- -- revert x,
-    -- -- admit,
-    -- -- focus {
-    -- --     induction entails_φ;
-    -- --     revert sat;
-    -- --     dunfold model.satisfies';
-    -- --     try{simp};
-    -- --     intro sat;
-    -- --     convert sat;
-    -- --     try{simp},
-    -- --         ext,
-    -- --         focus {
-    -- --             induction (entails_φ_v x_1),
-    -- --                 dunfold model.reference',
-    -- --                 revert asg,
-    -- --             -- dunfold term.rw,
-    -- --             by_cases entails_x = a,
-    -- --             -- simp [h],
-                
-    -- --         },
-    -- --     revert sat;
-    -- --     dunfold formula.rw;
-    -- --     dunfold model.satisfies';
-    -- --     try{simp},
-    -- --         intro sat,
-    -- -- },
-    -- -- admit,
-    -- -- case universal elim
-    -- -- focus {
-    -- --     induction entails_φ;
-    -- --     have sat := entails_ih h;
-    -- --     revert sat;
-    -- --     dunfold formula.rw; try{simp},
-    -- --     -- I cant go any further applying strategies to
-    -- --     -- all goals because the linter gets very slow.
-    -- --     dunfold model.satisfies', try{simp},
-    -- --         intro sat,
-    -- -- },
-    -- -- have sat := entails_ih h,
-    -- admit,
+    exact (rw_semantics sub).2 ih,
+    -- case exfalso
+    exfalso,
+    have ih := entails_ih ass h,
+    revert ih,
+    dunfold model.satisfies',
+    contradiction,
+    -- case by contradiction
+    classical,
+    by_contradiction,
+    have ih := entails_ih ass h,
+    revert ih,
+    dunfold formula.not model.satisfies',
+    simp,
+    intro ih,
+    apply ih,
+    intro insanity,
+    contradiction,
+    -- case identity intro
+    dunfold model.satisfies',
+    simp,
+    -- case identity elimination
+    have ih₁ := entails_ih_h ass h,
+    have ih₂ := entails_ih_eq ass h,
+    rename entails_sub₁ sub₁,
+    rename entails_sub₂ sub₂,
+    replace ih₁ := (rw_semantics sub₁).mp ih₁,
+    apply (rw_semantics sub₂).2,
+    convert ih₁ using 2,
+    revert ih₂,
+    dunfold model.satisfies',
+    simp,
+    intro ih₂,
+    rw ←ih₂,
 end
 
+
+-- instance model_inh : nonempty model := sorry
+
+-- theorem consistency : consistent ∅ :=
+-- begin
+--     intro h,
+--     replace h := soundness ∅ formula.false h,
+--     have M : model := sorry,
+--     have ass : vasgn := sorry,
+--     specialize h M ass,
+--     revert h,
+--     dunfold model.satisfies',
+--     simp,
+-- end
 
 
 end semantics
