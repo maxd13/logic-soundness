@@ -66,10 +66,29 @@ def expression := subtype {t : term | t.conotes}-- ∧ t.concrete}
 -- def cterm := subtype term.concrete
 
 theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
-    sorry
+begin
+    intros t₁ t₂ x,
+    induction t₁;
+    dunfold term.vars term.rw;
+    simp;
+    intro h,
+        simp[h],
+    ext y,
+    specialize h y,
+    exact t₁_ih y h,
+end
 
 theorem trivial_rw : ∀ (t:term) (x), t.rw x (term.var x) = t :=
-    sorry
+begin
+    intros t x,
+    induction t;
+    dunfold term.rw,
+        by_cases x = t;
+        simp [h],
+    simp at *,
+    ext y,
+    exact t_ih y,
+end
 
 theorem den_rw : ∀ (t₁ t₂ : term) (x : ℕ), t₁.denotes → t₁.rw x t₂ = t₁ :=
 begin
@@ -475,14 +494,25 @@ lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass
         simp[h],
     end
 
-lemma bind_term : ∀ {M:model} {ass :vasgn} {x : ℕ} {t₁ t₂ : term} {a},
-                  x ∉ t₁.vars → x ∉ t₂.vars →
-                  ((M.reference' t₁ (vasgn.bind ass x a) =
-                  M.reference' t₂ (vasgn.bind ass x a)) ↔
-                  (M.reference' t₁ ass =
-                  M.reference' t₂ ass)) :=
+lemma bind_term : ∀ {M:model} {ass :vasgn} {x : ℕ} {t : term} {a},
+                  x ∉ t.vars →
+                  M.reference' t (vasgn.bind ass x a) =
+                  M.reference' t ass :=
 begin
-    admit,
+    intros M ass x t a,
+    induction t;
+    dunfold term.vars;
+    simp;
+    intro h,
+        dunfold model.reference' vasgn.bind,
+        simp [ne.symm h],
+    cases t_n;
+        dunfold model.reference';
+        simp,
+    congr,
+    ext y,
+    specialize h y,
+    exact t_ih y h,
 end
 
 lemma bind₃ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
@@ -560,7 +590,7 @@ begin
     exact (φ_ih h).2 h₁,
         push_neg at h₀,
         obtain ⟨h₀, h₁⟩ := h₀,
-        exact bind_term h₀ h₁,
+        rw [bind_term h₀, bind_term h₁],
 end
 
 lemma fundamental : ∀ y x (M : model) ass, abstract_in y Γ → 
@@ -576,6 +606,25 @@ begin
     exact (bind₃ h₁).2 h₂,
 end
 
+lemma term_rw_semantics : ∀ {M:model} {ass:vasgn} {x} {t₁ t₂ : term},
+                          M.reference' (t₁.rw x t₂) ass =
+                          M.reference' t₁ (ass.bind x (M.reference' t₂ ass))
+                          :=
+begin
+    intros M ass x t₁ t₂,
+    induction t₁,
+        dunfold term.rw model.reference',
+        by_cases x = t₁;
+            simp [vasgn.bind, h],
+        dunfold model.reference',
+        simp [ne.symm h],
+    cases t₁_n;
+        dunfold term.rw model.reference';
+        simp,
+    congr,
+    ext y,
+    exact t₁_ih y,
+end
 
 lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
                      φ.substitutable x t →
@@ -583,69 +632,79 @@ lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
                      M.satisfies' φ (ass.bind x (M.reference' t ass))) 
                      :=
 begin
-    -- intros M ass x t φ,
-    -- classical,
-    -- -- rename _inst_1 dont_annoy,
-    -- by_cases xf : x ∉ φ.free,
-    --     rw formula_rw xf t,
-    --     simp[bind₃ xf],
-    -- simp at xf,
-    -- -- no more need for classical reasoning.
-    -- clear _inst,
-    -- revert xf,
-    -- induction φ generalizing ass;
-    -- dunfold formula.rw model.satisfies';
-    -- try{simp};
-    -- intro xf,
-    -- focus {
-    --     constructor;
-    --     intro h,
-    --     all_goals{
-    --     convert h,
-    --     ext y,
-    --     induction φ_v y;
-    --     dunfold term.rw model.reference' vasgn.bind,
-    --         by_cases eq : a = x;
-    --             simp [eq],
-    --         replace eq := ne.symm eq,
-    --         simp [eq],
-    --         dunfold model.reference',
-    --         refl,
-    --     simp,
-    --     cases n;
-    --         dunfold model.reference';
-    --         simp,
-    --     congr,
-    --     ext z,
-    --     exact ih z,},
-    -- },
-    -- focus{
-    --     revert xf,
-    --     dunfold formula.free,
-    --     simp_intros xf,
-    --     obtain ⟨xf₁, xf₂⟩ := xf,
-    --     replace xf₂ := ne.symm xf₂,
-    --     simp [xf₂],
-    --     constructor;
-    --     intros h a,
-    --         -- specialize h a,
-    --         -- -- simp [bind] at h,
-    --         -- have ih := (φ_ih xf₁).mp h,
-    --         -- rw bind_symm,
-    --         -- revert ih,
-    --         -- induction t;
-    --         -- dunfold model.reference' vasgn.bind;
-    --         -- intro ih,
-    --         admit,
-    --     set asg := ass.bind x (M.reference' t ass),
-    --     specialize h (asg φ_a),
-    --     simp [bind] at h,
-    --     have ih := (φ_ih xf₁).2 h,
-    --     admit,
-        
-        
-    -- },
-    admit,
+    intros M ass x t φ,
+    induction φ generalizing ass;
+    dunfold formula.substitutable formula.rw model.satisfies';
+    try{simp},
+    focus {
+        constructor;
+        intro h,
+        all_goals{
+        convert h,
+        ext y,
+        induction φ_v y;
+        dunfold term.rw model.reference' vasgn.bind,
+            by_cases eq : a = x;
+                simp [eq],
+            replace eq := ne.symm eq,
+            simp [eq],
+            dunfold model.reference',
+            refl,
+        simp,
+        cases n;
+            dunfold model.reference';
+            simp,
+        congr,
+        ext z,
+        exact ih z,},
+    },
+
+    focus{
+        intro h,
+        by_cases c : φ_a = x,
+            simp [c, bind₂],
+        simp [c],
+        cases h,
+            revert h,
+            dunfold formula.free,
+            simp_intros h,
+            classical,
+            replace h : x ∉ φ_a_1.free,
+                by_contradiction H,
+                replace h := eq.symm (h H),
+                contradiction,
+            constructor; intros hyp a;
+            specialize hyp a,
+                rw formula_rw h t at hyp,
+                rw bind_symm (ne.symm c),
+                rwa bind₃ h,
+            rw formula_rw h t,
+            rw bind_symm (ne.symm c) at hyp,
+            rwa bind₃ h at hyp,
+        obtain ⟨h₁, h₂⟩ := h,
+        constructor; intros hyp a;
+        specialize hyp a;
+        have ih := @φ_ih (vasgn.bind ass φ_a a) h₂;
+        rw bind_term h₁ at ih,
+            rw bind_symm (ne.symm c),
+            exact ih.mp hyp,
+        rw bind_symm (ne.symm c) at hyp,
+        apply ih.2,
+        exact hyp,
+    },
+        intros sub₁ sub₂,
+        constructor; intros h₁ h₂;
+        have ih₁ := @φ_ih_a ass sub₁;
+        have ih₂ := @φ_ih_a_1 ass sub₂,
+            replace h₂ := ih₁.2 h₂,
+            apply ih₂.mp,
+            apply_assumption,
+            exact h₂,
+        replace h₂ := ih₁.mp h₂,
+        apply ih₂.2,
+        apply_assumption,
+        exact h₂,
+    simp [term_rw_semantics],
 end
 
 -- So pretty.
