@@ -357,6 +357,81 @@ begin
     assumption,
 end 
 
+-- open finset
+
+-- local notation `{` x `}ₙ` := finset.singleton x
+
+-- #find ∀ _ ∈ _, ∃ _, _
+
+def list.to_set : list formula → set formula
+| [] := ∅
+| (φ::xs) := {φ} ∪ xs.to_set
+
+def proof : list formula → Prop
+| [] := false
+| (ψ::[]) := ψ ∈ Γ ∨ ∅ ⊢ ψ
+| (ψ::xs) := (ψ ∈ Γ ∨ list.to_set xs ⊢ ψ) ∧ 
+             proof xs
+
+def proof_of (φ) : list formula → Prop
+| [] := false
+| (ψ::xs) := ψ = φ ∧ proof Γ (ψ::xs)
+
+-- theorem finite_proofs :  Γ ⊢ φ → ∃ xs : list formula, proof_of Γ φ xs :=
+-- begin
+--     intro h,
+--     induction h,
+--     -- case reflexivity
+--     let xs := [h_φ], 
+--     use xs,
+--     simp [xs, proof_of,proof],
+--     left,
+--     assumption,
+--     -- case transitivity
+--     rename h_ih_h₁ ih,
+--     obtain ⟨p, hp⟩ := h_ih_h₂,
+--     -- let xs : list formula,
+--     --     cases p;
+--     --         simp[proof_of] at hp,
+--     --         contradiction,
+--     --     obtain ⟨hp₁, hp₂⟩ := hp,
+--     --     revert hp₂,
+--     admit,
+--     -- case modus ponens
+-- end
+
+-- theorem finite_proofs :  Γ ⊢ φ → ∃ Δ : finset formula, ↑Δ ⊆ Γ ∧ ↑Δ ⊢ φ :=
+-- begin
+--     intro h,
+--     induction h,
+--     -- case reflexivity
+--     existsi finset.singleton h_φ,
+--     simp [entails.reflexivity],
+--     assumption,
+--     -- case transitivity
+--     obtain ⟨Δ, HΔ, hΔ⟩ := h_ih_h₂,
+--     -- have c : ∀ ψ ∈ Δ, ∃ (Δ₂ : finset formula), ↑Δ₂ ⊆ h_Γ ∧ entails ↑Δ₂ ψ,
+--     --     intros ψ Hψ,
+--     --     exact h_ih_h₁ ψ (HΔ Hψ),
+--     -- have c := λ ψ ∈ Δ, classical.subtype_of_exists (h_ih_h₁ ψ (HΔ _)),
+--     -- have c₂ : ⋃ ψ ∈ Δ, classical.some (h_ih_h₁ ψ (HΔ _)),
+--     -- have d : ∀ {α} 
+
+--     -- induction Δ using finset.induction,
+--     --     admit,
+--     --     use ∅,
+--     --     simp,
+--     --     exact hΔ,
+    
+--     -- classical,
+--     -- by_cases ne : Δ.nonempty,
+--     -- obtain ⟨ψ, Hψ⟩ := ne,
+    
+--     -- have ih := h_ih_h₁ ψ H,
+--     -- existsi ⋃ ψ ∈ Δ, (c ψ H).val,
+
+-- end
+
 -- Doesn't need to be defined just for theories
 def consistent (Γ : set formula) := ¬ Γ ⊢ formula.false
 
