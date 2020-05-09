@@ -13,12 +13,12 @@ structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
 
 variables {σ : signature} {α : Type u} [nonempty α]
 -- variable assignment
-def vasgn (α : Type u) := ℕ → α
+def signature.vasgn (σ : signature) (α : Type u) := σ.vars → α
 
 #check signature.term.var
 
 -- @[reducible]
-def signature.structure.reference' (M : σ.structure α) : σ.term → vasgn α → α
+def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
 | (signature.term.var x) asg := asg x
 | (@signature.term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
 | (@signature.term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
@@ -59,10 +59,10 @@ def signature.structure.reference (M : σ.structure α) : σ.pterm → α :=
         exact M.I₁ t_f ih,
     end
 
-def vasgn.bind (ass : vasgn α) (x : ℕ) (val : α) : vasgn α :=
+def signature.vasgn.bind (ass : σ.vasgn α) (x : σ.vars) (val : α) : σ.vasgn α :=
     λy, if y = x then val else ass y
 
-def signature.structure.satisfies' : σ.structure α →  σ.formula → vasgn α → Prop
+def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasgn α → Prop
 | M ( signature.formula.relational r v) asg := 
           M.I₂ r $ λm,  M.reference' (v m) asg
 | M ( signature.formula.for_all x φ) ass :=
@@ -80,7 +80,7 @@ def signature.structure.satisfies' : σ.structure α →  σ.formula → vasgn �
 
 @[reducible]
 def signature.structure.satisfies : σ.structure α →  σ.formula → Prop
-| M φ := ∀ (ass : vasgn α), M.satisfies' φ ass
+| M φ := ∀ (ass : σ.vasgn α), M.satisfies' φ ass
 
 local infixr `⊨₁`:55 := signature.structure.satisfies
 -- local infixr `⊢`:55 := proof
@@ -101,44 +101,44 @@ variables (Γ : set σ.formula) (φ : σ.formula)
 
 -- semantic consequence
 def theory.follows : Prop :=
-    ∀ (M : σ.structure α) (ass : vasgn α),
+    ∀ (M : σ.structure α) (ass : σ.vasgn α),
       (∀ ψ ∈ Γ, M.satisfies' ψ ass) → M.satisfies' φ ass
 
 local infixr `⊨`:55 := @theory.follows σ α _
 
 #check theory.follows
 
-lemma bind_symm : ∀ {ass : vasgn α} {x y : ℕ} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a :=
+lemma bind_symm : ∀ {ass : σ.vasgn α} {x y : σ.vars} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a :=
     begin
         intros ass x y a b h,
-        simp [vasgn.bind],
+        simp [signature.vasgn.bind],
         ext z,
         replace h := ne.symm h,
         by_cases eq : z = y;
             simp[eq, h],
     end
 
-lemma bind₁ : ∀ {ass : vasgn α} {x : ℕ}, ass.bind x (ass x) = ass :=
+lemma bind₁ : ∀ {ass : σ.vasgn α} {x : σ.vars}, ass.bind x (ass x) = ass :=
     begin
         intros ass x,
-        simp [vasgn.bind],
+        simp [signature.vasgn.bind],
         ext y,
         by_cases y = x;
         simp[h],
     end
 
-lemma bind₂ : ∀ {ass : vasgn α} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass.bind x b :=
+lemma bind₂ : ∀ {ass : σ.vasgn α} {x : σ.vars} {a b}, (ass.bind x a).bind x b = ass.bind x b :=
     begin
         intros ass x a b,
-        simp [vasgn.bind],
+        simp [signature.vasgn.bind],
         ext y,
         by_cases y = x;
         simp[h],
     end
 
-lemma bind_term : ∀ {M : σ.structure α} {ass : vasgn α} {x : ℕ} {t : σ.term} {a},
+lemma bind_term : ∀ {M : σ.structure α} {ass : σ.vasgn α} {x : σ.vars} {t : σ.term} {a},
                   x ∉ t.vars →
-                  M.reference' t (vasgn.bind ass x a) =
+                  M.reference' t (signature.vasgn.bind ass x a) =
                   M.reference' t ass :=
 begin
     intros M ass x t a,
@@ -146,7 +146,7 @@ begin
     dunfold signature.term.vars;
     simp;
     intro h,
-        dunfold signature.structure.reference' vasgn.bind,
+        dunfold signature.structure.reference' signature.vasgn.bind,
         simp [ne.symm h],
     cases t_n;
         dunfold signature.structure.reference';
@@ -157,7 +157,7 @@ begin
     exact t_ih y h,
 end
 
-lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : vasgn α}{x : ℕ}{a},
+lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : σ.vasgn α}{x : σ.vars}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
@@ -190,7 +190,7 @@ begin
             specialize h₀ y,
             revert h₀,
             induction φ_v y;
-            dunfold signature.term.vars signature.structure.reference' vasgn.bind;
+            dunfold signature.term.vars signature.structure.reference' signature.vasgn.bind;
             intro h₀,
                 simp at h₀,
                 replace h₀ := ne.symm h₀,
@@ -248,7 +248,7 @@ begin
     exact (bind₃ h₁).2 h₂,
 end
 
-lemma term_rw_semantics : ∀ {M : σ.structure α} {ass:vasgn α} {x} {t₁ t₂ : σ.term},
+lemma term_rw_semantics : ∀ {M : σ.structure α} {ass:σ.vasgn α} {x} {t₁ t₂ : σ.term},
                           M.reference' (t₁.rw x t₂) ass =
                           M.reference' t₁ (ass.bind x (M.reference' t₂ ass))
                           :=
@@ -257,7 +257,7 @@ begin
     induction t₁,
         dunfold signature.term.rw signature.structure.reference',
         by_cases x = t₁;
-            simp [vasgn.bind, h],
+            simp [signature.vasgn.bind, h],
         dunfold signature.structure.reference',
         simp [ne.symm h],
     cases t₁_n;
@@ -268,7 +268,7 @@ begin
     exact t₁_ih y,
 end
 
-lemma rw_semantics : ∀ {M : σ.structure α} {ass:vasgn α} {x t} {φ: σ.formula},
+lemma rw_semantics : ∀ {M : σ.structure α} {ass:σ.vasgn α} {x t} {φ: σ.formula},
                      φ.substitutable x t →
                      (M.satisfies' (φ.rw x t) ass ↔
                      M.satisfies' φ (ass.bind x (M.reference' t ass))) 
@@ -285,7 +285,7 @@ begin
         convert h,
         ext y,
         induction φ_v y;
-        dunfold signature.term.rw signature.structure.reference' vasgn.bind,
+        dunfold signature.term.rw signature.structure.reference' signature.vasgn.bind,
             by_cases eq : a = x;
                 simp [eq],
             replace eq := ne.symm eq,
@@ -326,7 +326,7 @@ begin
         obtain ⟨h₁, h₂⟩ := h,
         constructor; intros hyp a;
         specialize hyp a;
-        have ih := @φ_ih (vasgn.bind ass φ_a a) h₂;
+        have ih := @φ_ih (signature.vasgn.bind ass φ_a a) h₂;
         rw bind_term h₁ at ih,
             rw bind_symm (ne.symm c),
             exact ih.mp hyp,
@@ -439,7 +439,7 @@ end
 --     intro h,
 --     replace h := soundness ∅  signature.formula.false h,
 --     have M : signature.structure := sorry,
---     have ass : vasgn α := sorry,
+--     have ass : σ.vasgn α := sorry,
 --     specialize h M ass,
 --     revert h,
 --     dunfold signature.structure.satisfies',

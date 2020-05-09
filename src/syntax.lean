@@ -11,8 +11,41 @@ open list tactic set
 structure signature :=
     (functional_symbol : Type u)
     (relational_symbol : Type u)
+    (vars : Type u) 
+    (dec_vars : decidable_eq vars)
     (arity : functional_symbol → ℕ)
     (rarity : relational_symbol → ℕ)
+
+class signature.symbolic (σ : signature) :=
+    (dec_fun : decidable_eq σ.functional_symbol)
+    (dec_rel : decidable_eq σ.relational_symbol)
+
+
+instance dec_vars  (σ : signature) : decidable_eq σ.vars := σ.dec_vars 
+instance dec_fun (σ : signature) [h : σ.symbolic] : decidable_eq σ.functional_symbol := h.dec_fun
+instance dec_rel (σ : signature) [h : σ.symbolic] : decidable_eq σ.relational_symbol := h.dec_rel
+
+structure varless_signature :=
+    (functional_symbol : Type u)
+    (relational_symbol : Type u)
+    (arity : functional_symbol → ℕ)
+    (rarity : relational_symbol → ℕ)
+
+def varless_signature.up (σ : varless_signature) : signature := 
+{ functional_symbol := σ.functional_symbol,
+  relational_symbol := σ.relational_symbol,
+  vars := ℕ,
+  dec_vars := by apply_instance,
+  arity := σ.arity,
+  rarity := σ.rarity 
+}
+
+instance varless_signature_inhabited : inhabited varless_signature :=
+    ⟨⟨pempty, pempty, (λ_, 0), (λ_, 0)⟩⟩
+
+-- empty signature
+instance signature_inhabited : inhabited signature :=
+    ⟨(default varless_signature).up⟩
 
 variable {σ : signature}
 
@@ -25,31 +58,28 @@ def signature.const (σ : signature) := σ.nary 0
 
 -- terms in the language
 inductive signature.term (σ : signature)
-| var : ℕ → signature.term
+| var : σ.vars → signature.term
 | app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
-
-#check signature
-#check term
 
 -- constant terms.
 def signature.nary.term : σ.const → σ.term
 | c := term.app c fin_zero_elim
 
 @[reducible]
-def signature.term.rw : σ.term → ℕ → σ.term → σ.term
+def signature.term.rw : σ.term → σ.vars → σ.term → σ.term
 | (term.var a) x t := if x = a then t else term.var a
 | (term.app f v) x t := 
     let v₂ := λ m, signature.term.rw (v m) x t in
     term.app f v₂
 
-def signature.term.vars  : σ.term → set ℕ
+def signature.term.vars  : σ.term → set σ.vars
 | (term.var a) := {a}
 | (term.app f v) :=
     let v₂ := λ m, signature.term.vars (v m) in
     ⋃ m, v₂ m
 
 @[reducible]
-def signature.term.denotes (t : σ.term) : Prop := t.vars = (∅ : set ℕ)
+def signature.term.denotes (t : σ.term) : Prop := t.vars = (∅ : set σ.vars)
 @[reducible]
 def signature.term.conotes (t : σ.term) := ¬ t.denotes
 
@@ -61,7 +91,7 @@ def signature.pterm (σ : signature) := subtype {t : σ.term | t.denotes}-- ∧ 
 def signature.expression (σ : signature) := subtype {t : σ.term | t.conotes}-- ∧ t.concrete}
 -- def cterm := subtype term.concrete
 
-theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : σ.term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
+theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : σ.term) (x : σ.vars), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
 begin
     intros t₁ t₂ x,
     induction t₁;
@@ -86,7 +116,7 @@ begin
     exact t_ih y,
 end
 
-theorem den_rw : ∀ (t₁ t₂ : σ.term) (x : ℕ), t₁.denotes → t₁.rw x t₂ = t₁ :=
+theorem den_rw : ∀ (t₁ t₂ : σ.term) (x : σ.vars), t₁.denotes → t₁.rw x t₂ = t₁ :=
 begin
     intros t₁ t₂ x den₁,
     induction t₁,
@@ -127,7 +157,7 @@ def signature.term.subterms : σ.term → set σ.term
     (⋃ m, v₂ m) ∪ {(term.app f v)}
 | t := {t}
 
-def list.vars : list σ.term → set ℕ
+def list.vars : list σ.term → set σ.vars
 | [] := ∅
 | (hd :: tl) := hd.vars ∪ tl.vars
 
@@ -135,7 +165,7 @@ def list.subterms : list σ.term → set σ.term
 | [] := ∅
 | (hd :: tl) := hd.subterms ∪ tl.subterms
 
-def list.rw : list σ.term → ℕ → σ.term → list σ.term
+def list.rw : list σ.term → σ.vars → σ.term → list σ.term
 | [] _ _:= ∅
 | (hd :: tl) x t := (hd.rw x t) :: tl.rw x t
 
@@ -145,7 +175,7 @@ def subterms : set σ.term → set σ.term
 --  formulas
 inductive  signature.formula (σ : signature)
 | relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
-| for_all :  ℕ →  signature.formula →  signature.formula
+| for_all :  σ.vars →  signature.formula →  signature.formula
 | if_then :  signature.formula →  signature.formula →  signature.formula
 | equation (t₁ t₂ : σ.term) :  signature.formula
 | false :  signature.formula
@@ -163,7 +193,7 @@ def  signature.formula.iff (φ ψ :  σ.formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
 
 -- local notation `∼` :=  signature.formula.not
 
-def  signature.formula.rw :  σ.formula → ℕ → σ.term →  σ.formula
+def  signature.formula.rw :  σ.formula → σ.vars → σ.term →  σ.formula
 | ( signature.formula.relational r v) x t :=
     let v₂ := λ m, (v m).rw x t in
      signature.formula.relational r v₂
@@ -175,14 +205,14 @@ def  signature.formula.rw :  σ.formula → ℕ → σ.term →  σ.formula
 | φ _ _ := φ
 
 -- free variables
-def  signature.formula.free :  σ.formula → set ℕ
+def  signature.formula.free :  σ.formula → set σ.vars
 | ( signature.formula.relational r v) := ⋃ m, (v m).vars
 | ( signature.formula.for_all x φ) := φ.free - {x}
 | ( signature.formula.if_then φ ψ) := φ.free ∪ ψ.free
 | ( signature.formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
 |  signature.formula.false := ∅
 
-def  signature.formula.substitutable  :  σ.formula → ℕ → σ.term → Prop
+def  signature.formula.substitutable  :  σ.formula → σ.vars → σ.term → Prop
 | ( signature.formula.for_all y φ) x t := x ∉ ( signature.formula.for_all y φ).free ∨
                                 (y ∉ t.vars ∧ φ.substitutable x t) 
 | ( signature.formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
@@ -195,7 +225,7 @@ def  signature.formula.closed :  σ.formula → Prop
 def  signature.formula.open :  σ.formula → Prop
 | φ := ¬ φ.closed
 
-def  signature.formula.vars :  σ.formula → set ℕ
+def  signature.formula.vars :  σ.formula → set σ.vars
 | ( signature.formula.for_all x φ) := φ.free ∪ {x}
 | ( signature.formula.if_then φ ψ) := φ.vars ∪ ψ.vars
 | φ := φ.free
@@ -210,16 +240,16 @@ def term.abstract_in : σ.term → set  σ.formula → Prop
 | t S := t ∉ (⋃ φ ∈ S,  signature.formula.terms φ)
 
 @[reducible]
-def abstract_in : ℕ → set  σ.formula → Prop
+def abstract_in : σ.vars → set  σ.formula → Prop
 | x S := x ∉ (⋃ φ ∈ S,  signature.formula.free φ)
 
 -- construct the generalization of a  σ.formula from a list of variables.
 -- This is just a fold but, I like being explicit in my folds when possible.
-def  signature.formula.generalize :  σ.formula → list ℕ →  σ.formula
+def  signature.formula.generalize :  σ.formula → list σ.vars →  σ.formula
 | φ [] := φ
 | φ (x::xs) :=  signature.formula.for_all x $ φ.generalize xs
 
-theorem formula_rw : ∀ {φ :  σ.formula} {x : ℕ}, x ∉ φ.free → ∀(t : σ.term),φ.rw x t = φ :=
+theorem formula_rw : ∀ {φ :  σ.formula} {x : σ.vars}, x ∉ φ.free → ∀(t : σ.term),φ.rw x t = φ :=
     begin
         intros φ x h t,
         revert h,
@@ -305,13 +335,13 @@ inductive proof : set  σ.formula →  σ.formula → Type u_1
              : proof Γ (φ ⇒ ψ)
 | for_all_intro
             (Γ : set  σ.formula) (φ :  σ.formula)
-            (x : ℕ) (xf : x ∈ φ.free)
+            (x : σ.vars) (xf : x ∈ φ.free)
             (abs : abstract_in x Γ)
             (h : proof Γ φ)
              : proof Γ ( signature.formula.for_all x φ)
 | for_all_elim
             (Γ : set  σ.formula) (φ :  σ.formula)
-            (x : ℕ) --(xf : x ∈ φ.free)
+            (x : σ.vars) --(xf : x ∈ φ.free)
             (t : σ.term) (sub : φ.substitutable x t)
             (h : proof Γ ( signature.formula.for_all x φ))
              : proof Γ (φ.rw x t)
@@ -326,7 +356,7 @@ inductive proof : set  σ.formula →  σ.formula → Type u_1
              : proof Γ ( signature.formula.equation t t)
 | identity_elim 
             (Γ : set  σ.formula) (φ :  σ.formula)
-            (x : ℕ) (xf : x ∈ φ.free)
+            (x : σ.vars) (xf : x ∈ φ.free)
             (t₁ t₂: σ.term)
             (sub₁ : φ.substitutable x t₁)
             (sub₂ : φ.substitutable x t₂)
