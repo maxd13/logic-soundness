@@ -21,55 +21,58 @@ structure signature :=
     (rarity : relational_symbol → ℕ)
 
 section formulas
-parameters {functional_symbol : Type u}
-parameter {relational_symbol : Type u}
-parameter {arity : functional_symbol → ℕ}
-parameter {rarity : relational_symbol → ℕ}
+variable {σ : signature}
 
 -- arity types
-def is_constant (f : functional_symbol) := arity f = 0
-def nary (n : ℕ) := subtype {f : functional_symbol | arity f = n}
-def nrary (n : ℕ) := subtype {r : relational_symbol | rarity r = n}
+def is_constant (f : σ.functional_symbol) := σ.arity f = 0
+def signature.nary (σ : signature) (n : ℕ) := subtype {f : σ.functional_symbol | σ.arity f = n}
+def signature.nrary (σ : signature) (n : ℕ) := subtype {r : σ.relational_symbol | σ.rarity r = n}
 @[reducible]
-def const := nary 0
+def signature.const (σ : signature) := σ.nary 0
 
 -- terms in the language
-inductive term
-| var : ℕ → term
-| app  {n : ℕ} (f : nary n) (v : fin n → term) :  term
+inductive signature.term (σ : signature)
+| var : ℕ → signature.term
+| app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
+
+#check signature
+#check term
 
 -- constant terms.
-def nary.term : const → term
+def signature.nary.term : σ.const → σ.term
 | c := term.app c fin_zero_elim
 
 @[reducible]
-def term.rw : term → ℕ → term → term
+def signature.term.rw : σ.term → ℕ → σ.term → σ.term
 | (term.var a) x t := if x = a then t else term.var a
 | (term.app f v) x t := 
-    let v₂ := λ m, term.rw (v m) x t in
+    let v₂ := λ m, signature.term.rw (v m) x t in
     term.app f v₂
 
-def term.vars : term → set ℕ
+def signature.term.vars  : σ.term → set ℕ
 | (term.var a) := {a}
 | (term.app f v) :=
-    let v₂ := λ m, term.vars (v m) in
+    let v₂ := λ m, signature.term.vars (v m) in
     ⋃ m, v₂ m
 
 @[reducible]
-def term.denotes (t : term) := t.vars = ∅
+def signature.term.denotes (t : σ.term) : Prop := t.vars = (∅ : set ℕ)
 @[reducible]
-def term.conotes (t : term) := ¬ t.denotes
+def signature.term.conotes (t : σ.term) := ¬ t.denotes
 
--- a term in the proper sense of the term (pun intended).
-def pterm := subtype {t : term | t.denotes}-- ∧ t.concrete}
-def expression := subtype {t : term | t.conotes}-- ∧ t.concrete}
+
+#check signature.term.denotes
+
+-- a σ.term in the proper sense of the σ.term (pun intended).
+def signature.pterm (σ : signature) := subtype {t : σ.term | t.denotes}-- ∧ t.concrete}
+def signature.expression (σ : signature) := subtype {t : σ.term | t.conotes}-- ∧ t.concrete}
 -- def cterm := subtype term.concrete
 
-theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
+theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : σ.term) (x : ℕ), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
 begin
     intros t₁ t₂ x,
     induction t₁;
-    dunfold term.vars term.rw;
+    dunfold signature.term.vars signature.term.rw;
     simp;
     intro h,
         simp[h],
@@ -78,11 +81,11 @@ begin
     exact t₁_ih y h,
 end
 
-theorem trivial_rw : ∀ (t:term) (x), t.rw x (term.var x) = t :=
+theorem trivial_rw : ∀ (t: σ.term) (x), t.rw x (term.var x) = t :=
 begin
     intros t x,
     induction t;
-    dunfold term.rw,
+    dunfold signature.term.rw,
         by_cases x = t;
         simp [h],
     simp at *,
@@ -90,7 +93,7 @@ begin
     exact t_ih y,
 end
 
-theorem den_rw : ∀ (t₁ t₂ : term) (x : ℕ), t₁.denotes → t₁.rw x t₂ = t₁ :=
+theorem den_rw : ∀ (t₁ t₂ : σ.term) (x : ℕ), t₁.denotes → t₁.rw x t₂ = t₁ :=
 begin
     intros t₁ t₂ x den₁,
     induction t₁,
@@ -121,121 +124,121 @@ begin
         have c₂ : ∀ m, (t₁_v m).rw x t₂ = (t₁_v m),
             intro m,
             exact t₁_ih m (c₁ m),
-        dunfold term.rw, 
+        dunfold signature.term.rw, 
         simp[c₂],
 end
 
-def term.subterms : term → set term
+def signature.term.subterms : σ.term → set σ.term
 | (term.app f v) := 
-    let v₂ := λ m, term.subterms (v m) in
+    let v₂ := λ m, signature.term.subterms (v m) in
     (⋃ m, v₂ m) ∪ {(term.app f v)}
 | t := {t}
 
-def list.vars : list term → set ℕ
+def list.vars : list σ.term → set ℕ
 | [] := ∅
 | (hd :: tl) := hd.vars ∪ tl.vars
 
-def list.subterms : list term → set term
+def list.subterms : list σ.term → set σ.term
 | [] := ∅
 | (hd :: tl) := hd.subterms ∪ tl.subterms
 
-def list.rw : list term → ℕ → term → list term
+def list.rw : list σ.term → ℕ → σ.term → list σ.term
 | [] _ _:= ∅
 | (hd :: tl) x t := (hd.rw x t) :: tl.rw x t
 
-def subterms : set term → set term
-| S := ⋃ x ∈ S, term.subterms x
+def subterms : set σ.term → set σ.term
+| S := ⋃ x ∈ S, signature.term.subterms x
 
--- formulas
-inductive formula
-| relational {n : ℕ} (r : nrary n) (v : fin n → term) : formula
-| for_all :  ℕ → formula → formula
-| if_then : formula → formula → formula
-| equation (t₁ t₂ : term) : formula
-| false : formula
+--  formulas
+inductive  signature.formula (σ : signature)
+| relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
+| for_all :  ℕ →  signature.formula →  signature.formula
+| if_then :  signature.formula →  signature.formula →  signature.formula
+| equation (t₁ t₂ : σ.term) :  signature.formula
+| false :  signature.formula
 
 reserve infixr ` ⇒ `:55
 class has_exp (α : Type u) := (exp : α → α → α)
 infixr ⇒ := has_exp.exp
 
-instance formula.has_exp : has_exp formula := ⟨formula.if_then⟩
+instance  signature.formula.has_exp : has_exp  σ.formula := ⟨ signature.formula.if_then⟩
 
-def formula.not (φ : formula)   := φ ⇒ formula.false
-def formula.or  (φ ψ : formula) := φ.not ⇒ ψ
-def formula.and (φ ψ : formula) := (φ.not.or ψ.not).not
-def formula.iff (φ ψ : formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
+def  signature.formula.not (φ :  σ.formula)   := φ ⇒  signature.formula.false
+def  signature.formula.or  (φ ψ :  σ.formula) := φ.not ⇒ ψ
+def  signature.formula.and (φ ψ :  σ.formula) := (φ.not.or ψ.not).not
+def  signature.formula.iff (φ ψ :  σ.formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
 
--- local notation `∼` := formula.not
+-- local notation `∼` :=  signature.formula.not
 
-def formula.rw : formula → ℕ → term → formula
-| (formula.relational r v) x t :=
+def  signature.formula.rw :  σ.formula → ℕ → σ.term →  σ.formula
+| ( signature.formula.relational r v) x t :=
     let v₂ := λ m, (v m).rw x t in
-    formula.relational r v₂
-| (formula.for_all y φ) x t :=
+     signature.formula.relational r v₂
+| ( signature.formula.for_all y φ) x t :=
     let ψ := if y = x then φ else φ.rw x t in
-    formula.for_all y ψ
-| (formula.if_then φ ψ) x t := (φ.rw x t) ⇒ (ψ.rw x t)
-| (formula.equation t₁ t₂) x t := formula.equation (t₁.rw x t) (t₂.rw x t)
+     signature.formula.for_all y ψ
+| ( signature.formula.if_then φ ψ) x t := (φ.rw x t) ⇒ (ψ.rw x t)
+| ( signature.formula.equation t₁ t₂) x t :=  signature.formula.equation (t₁.rw x t) (t₂.rw x t)
 | φ _ _ := φ
 
 -- free variables
-def formula.free : formula → set ℕ
-| (formula.relational r v) := ⋃ m, (v m).vars
-| (formula.for_all x φ) := φ.free - {x}
-| (formula.if_then φ ψ) := φ.free ∪ ψ.free
-| (formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
-| formula.false := ∅
+def  signature.formula.free :  σ.formula → set ℕ
+| ( signature.formula.relational r v) := ⋃ m, (v m).vars
+| ( signature.formula.for_all x φ) := φ.free - {x}
+| ( signature.formula.if_then φ ψ) := φ.free ∪ ψ.free
+| ( signature.formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
+|  signature.formula.false := ∅
 
-def formula.substitutable  : formula → ℕ → term → Prop
-| (formula.for_all y φ) x t := x ∉ (formula.for_all y φ).free ∨
+def  signature.formula.substitutable  :  σ.formula → ℕ → σ.term → Prop
+| ( signature.formula.for_all y φ) x t := x ∉ ( signature.formula.for_all y φ).free ∨
                                 (y ∉ t.vars ∧ φ.substitutable x t) 
-| (formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
+| ( signature.formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
 | _ _ _ := true
 
--- open and closed formulas.
-def formula.closed : formula → Prop
+-- open and closed  σ.formulas.
+def  signature.formula.closed :  σ.formula → Prop
 | φ := φ.free = ∅
 
-def formula.open : formula → Prop
+def  signature.formula.open :  σ.formula → Prop
 | φ := ¬ φ.closed
 
-def formula.vars : formula → set ℕ
-| (formula.for_all x φ) := φ.free ∪ {x}
-| (formula.if_then φ ψ) := φ.vars ∪ ψ.vars
+def  signature.formula.vars :  σ.formula → set ℕ
+| ( signature.formula.for_all x φ) := φ.free ∪ {x}
+| ( signature.formula.if_then φ ψ) := φ.vars ∪ ψ.vars
 | φ := φ.free
 
-def formula.terms : formula → set term
-| (formula.relational r v) := list.subterms (of_fn v)
-| (formula.for_all x φ) := φ.terms ∪ {term.var x}
-| (formula.if_then φ ψ) := φ.terms ∪ ψ.terms
+def  signature.formula.terms :  σ.formula → set σ.term
+| ( signature.formula.relational r v) := list.subterms (of_fn v)
+| ( signature.formula.for_all x φ) := φ.terms ∪ {term.var x}
+| ( signature.formula.if_then φ ψ) := φ.terms ∪ ψ.terms
 | _ := ∅
 
-def term.abstract_in : term → set formula → Prop
-| t S := t ∉ (⋃ φ ∈ S, formula.terms φ)
+def term.abstract_in : σ.term → set  σ.formula → Prop
+| t S := t ∉ (⋃ φ ∈ S,  signature.formula.terms φ)
 
 @[reducible]
-def abstract_in : ℕ → set formula → Prop
-| x S := x ∉ (⋃ φ ∈ S, formula.free φ)
+def abstract_in : ℕ → set  σ.formula → Prop
+| x S := x ∉ (⋃ φ ∈ S,  signature.formula.free φ)
 
--- construct the generalization of a formula from a list of variables.
+-- construct the generalization of a  σ.formula from a list of variables.
 -- This is just a fold but, I like being explicit in my folds when possible.
-def formula.generalize : formula → list ℕ → formula
+def  signature.formula.generalize :  σ.formula → list ℕ →  σ.formula
 | φ [] := φ
-| φ (x::xs) := formula.for_all x $ φ.generalize xs
+| φ (x::xs) :=  signature.formula.for_all x $ φ.generalize xs
 
-theorem formula_rw : ∀ {φ : formula} {x : ℕ}, x ∉ φ.free → ∀(t : term),φ.rw x t = φ :=
+theorem formula_rw : ∀ {φ :  σ.formula} {x : ℕ}, x ∉ φ.free → ∀(t : σ.term),φ.rw x t = φ :=
     begin
         intros φ x h t,
         revert h,
         induction φ;
-        dunfold formula.free formula.rw;
+        dunfold  signature.formula.free  signature.formula.rw;
         simp;
         intro h,
             ext y,
             specialize h y,
             revert h,
             induction φ_v y;
-            dunfold term.rw term.vars;
+            dunfold signature.term.rw signature.term.vars;
             intro h;
             simp at *,
                 simp[h],
@@ -263,18 +266,18 @@ theorem formula_rw : ∀ {φ : formula} {x : ℕ}, x ∉ φ.free → ∀(t : ter
         assumption,
     end
 
-lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
+lemma trivial_formula_rw : ∀ {φ: σ.formula} {x}, φ.rw x (term.var x) = φ :=
     begin
         intros φ x,
         induction φ;
         -- tactic.unfreeze_local_instances,
-        dunfold formula.rw;
+        dunfold  signature.formula.rw;
         try{simp},
         -- any_goals{assumption},
             -- convert h,
             ext,
             induction (φ_v x_1);
-            dunfold term.rw,
+            dunfold signature.term.rw,
             by_cases x = a;
                 simp [h],
             simp,
@@ -289,56 +292,58 @@ lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
         assumption,
     end
 
--- deductive consequence of formulas: Γ ⊢ φ.
+#check σ.formula
+
+-- deductive consequence of  σ.formulas: Γ ⊢ φ.
 -- Type of proofs from Γ to φ.
-inductive proof : set formula → formula → Type u
-| reflexivity (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : proof Γ φ
-| transitivity (Γ Δ : set formula) (φ : formula)
+inductive proof : set  σ.formula →  σ.formula → Type u_1
+| reflexivity (Γ : set  σ.formula) (φ :  σ.formula)(h : φ ∈ Γ) : proof Γ φ
+| transitivity (Γ Δ : set  σ.formula) (φ :  σ.formula)
                (h₁ : ∀ ψ ∈ Δ, proof Γ ψ)
                (h₂ : proof Δ φ) :  proof Γ φ
 | modus_ponens
-            (φ ψ : formula) (Γ : set formula)
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
             (h₁ : proof Γ (φ ⇒ ψ))
             (h₂ : proof Γ φ)
              : proof Γ ψ
 | intro
-            (φ ψ : formula) (Γ : set formula)
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
             (h : proof (Γ ∪ {φ}) ψ)
              : proof Γ (φ ⇒ ψ)
 | for_all_intro
-            (Γ : set formula) (φ : formula)
+            (Γ : set  σ.formula) (φ :  σ.formula)
             (x : ℕ) (xf : x ∈ φ.free)
             (abs : abstract_in x Γ)
             (h : proof Γ φ)
-             : proof Γ (formula.for_all x φ)
+             : proof Γ ( signature.formula.for_all x φ)
 | for_all_elim
-            (Γ : set formula) (φ : formula)
+            (Γ : set  σ.formula) (φ :  σ.formula)
             (x : ℕ) --(xf : x ∈ φ.free)
-            (t : term) (sub : φ.substitutable x t)
-            (h : proof Γ (formula.for_all x φ))
+            (t : σ.term) (sub : φ.substitutable x t)
+            (h : proof Γ ( signature.formula.for_all x φ))
              : proof Γ (φ.rw x t)
-| exfalso (Γ : set formula) (φ : formula)
-          (h : proof Γ formula.false)
+| exfalso (Γ : set  σ.formula) (φ :  σ.formula)
+          (h : proof Γ  signature.formula.false)
           : proof Γ φ
-| by_contradiction (Γ : set formula) (φ : formula)
+| by_contradiction (Γ : set  σ.formula) (φ :  σ.formula)
                    (h : proof Γ φ.not.not)
                    : proof Γ φ
 | identity_intro
-            (Γ : set formula) (t : term)
-             : proof Γ (formula.equation t t)
+            (Γ : set  σ.formula) (t : σ.term)
+             : proof Γ ( signature.formula.equation t t)
 | identity_elim 
-            (Γ : set formula) (φ : formula)
+            (Γ : set  σ.formula) (φ :  σ.formula)
             (x : ℕ) (xf : x ∈ φ.free)
-            (t₁ t₂: term)
+            (t₁ t₂: σ.term)
             (sub₁ : φ.substitutable x t₁)
             (sub₂ : φ.substitutable x t₂)
             (h : proof Γ (φ.rw x t₁))
-            (eq : proof Γ (formula.equation t₁ t₂))
+            (eq : proof Γ ( signature.formula.equation t₁ t₂))
              : proof Γ (φ.rw x t₂)
 
 local infixr `⊢`:55 := proof
 
-variables (Γ Δ : set formula) (φ : formula)
+variables (Γ Δ : set  σ.formula) (φ :  σ.formula)
 
 theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
 begin
@@ -359,7 +364,7 @@ begin
 end 
 
 
--- This depends on syntatical equality between formulas
+-- This depends on syntatical equality between  σ.formulas
 -- being decidable, which in turn depends on the equality of
 -- functional and relational symbols being decidable.
 -- def proof.premisses : Γ ⊢ φ → list (subtype Γ) :=
@@ -378,7 +383,7 @@ end
 --         -- case modus ponens
 --         exact h_ih_h₁ ++ h_ih_h₂,
 --         -- case intro
---         set t : set formula := h_Γ ∪ {h_φ},
+--         set t : set  σ.formula := h_Γ ∪ {h_φ},
 --         have ct : h_φ ∈ t, simp,
 --         let c : subtype t := ⟨h_φ, ct⟩,
 --         all_goals{admit},
@@ -392,21 +397,21 @@ end
 
 -- #find ∀ _ ∈ _, ∃ _, _
 
--- def list.to_set : list formula → set formula
+-- def list.to_set : list  σ.formula → set  σ.formula
 -- | [] := ∅
 -- | (φ::xs) := {φ} ∪ xs.to_set
 
--- def proof : list formula → Prop
+-- def proof : list  σ.formula → Prop
 -- | [] := false
 -- | (ψ::[]) := ψ ∈ Γ ∨ ∅ ⊢ ψ
 -- | (ψ::xs) := (ψ ∈ Γ ∨ list.to_set xs ⊢ ψ) ∧ 
 --              proof xs
 
--- def proof_of (φ) : list formula → Prop
+-- def proof_of (φ) : list  σ.formula → Prop
 -- | [] := false
 -- | (ψ::xs) := ψ = φ ∧ proof Γ (ψ::xs)
 
--- theorem finite_proofs :  Γ ⊢ φ → ∃ xs : list formula, proof_of Γ φ xs :=
+-- theorem finite_proofs :  Γ ⊢ φ → ∃ xs : list  σ.formula, proof_of Γ φ xs :=
 -- begin
 --     intro h,
 --     induction h,
@@ -419,7 +424,7 @@ end
 --     -- case transitivity
 --     rename h_ih_h₁ ih,
 --     obtain ⟨p, hp⟩ := h_ih_h₂,
---     -- let xs : list formula,
+--     -- let xs : list  σ.formula,
 --     --     cases p;
 --     --         simp[proof_of] at hp,
 --     --         contradiction,
@@ -429,7 +434,7 @@ end
 --     -- case modus ponens
 -- end
 
--- theorem finite_proofs :  Γ ⊢ φ → ∃ Δ : finset formula, ↑Δ ⊆ Γ ∧ ↑Δ ⊢ φ :=
+-- theorem finite_proofs :  Γ ⊢ φ → ∃ Δ : finset  σ.formula, ↑Δ ⊆ Γ ∧ ↑Δ ⊢ φ :=
 -- begin
 --     intro h,
 --     induction h,
@@ -439,7 +444,7 @@ end
 --     assumption,
 --     -- case transitivity
 --     obtain ⟨Δ, HΔ, hΔ⟩ := h_ih_h₂,
---     -- have c : ∀ ψ ∈ Δ, ∃ (Δ₂ : finset formula), ↑Δ₂ ⊆ h_Γ ∧ proof ↑Δ₂ ψ,
+--     -- have c : ∀ ψ ∈ Δ, ∃ (Δ₂ : finset  σ.formula), ↑Δ₂ ⊆ h_Γ ∧ proof ↑Δ₂ ψ,
 --     --     intros ψ Hψ,
 --     --     exact h_ih_h₁ ψ (HΔ Hψ),
 --     -- have c := λ ψ ∈ Δ, classical.subtype_of_exists (h_ih_h₁ ψ (HΔ _)),
@@ -462,96 +467,91 @@ end
 -- end
 
 -- Doesn't need to be defined just for theories
-def consistent (Γ : set formula) := ¬ nonempty (Γ ⊢ formula.false)
+def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
 
 -- At any rate we can define it for theories as well.
-def theory := subtype {Γ : set formula | ∀ φ, Γ ⊢ φ → φ ∈ Γ}
+def signature.theory (σ : signature) := subtype {Γ : set  σ.formula | ∀ φ, Γ ⊢ φ → φ ∈ Γ}
 
-def theory.consistent (Γ : theory) := consistent Γ.val
+def theory.consistent (Γ : σ.theory) := consistent Γ.val
 
 section semantics
 
-parameters {α : Type u} [nonempty α]
+structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
+    -- functional interpretation
+    (I₁ : Π {n}, σ.nary n → (fin n → α) → α)
+    -- relational interpretation
+    (I₂ : Π {n}, σ.nrary n → (fin n → α) → Prop)
 
--- functional interpretation
-def fint  {n : ℕ} := nary n → (fin n → α) → α
--- relational interpretation
-def rint {n : ℕ} := nrary n → (fin n → α) → Prop
+parameters {α : Type u} [nonempty α]
 -- variable assignment
 def vasgn := ℕ → α
 
--- parameter [exists_ass : nonempty vasgn]
-
-structure model :=
-    (I₁ : Π {n}, @fint n)
-    (I₂ : Π {n}, @rint n)
-
 -- @[reducible]
-def model.reference' (M : model) : term → vasgn → α
+def signature.structure.reference' (M : σ.structure α) : σ.term → vasgn → α
 | (term.var x) asg := asg x
-| (@term.app _ _  0 f _) _ := model.I₁ M f fin_zero_elim
-| (@term.app _ _  (n+1) f v) asg := let v₂ := λ k, model.reference' (v k) asg
-                                    in model.I₁ M f v₂
+| (@term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
+| (@term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
+                                    in M.I₁ f v₂
 
-def model.reference (M : model) : pterm → α :=
+def signature.structure.reference (M : σ.structure α) : σ.pterm → α :=
     begin
         intro t,
         obtain ⟨t, den⟩ := t,
         induction t,
             simp [set_of] at den,
             revert den,
-            dunfold term.denotes term.vars,
+            dunfold signature.term.denotes signature.term.vars,
             intro den,
             replace den := eq_empty_iff_forall_not_mem.mp den,
             specialize den t,
             simp at den,
             contradiction,
         cases t_n,
-            exact model.I₁ M t_f fin_zero_elim,
+            exact M.I₁ t_f fin_zero_elim,
         have den_v : ∀ x, (t_v x).denotes,
             intro x,
             simp [set_of] at den,
             revert den,
-            dunfold term.denotes term.vars,
+            dunfold signature.term.denotes signature.term.vars,
             simp,
             intro den,
-            have c := set.subset_Union (logic.term.vars ∘ t_v) x,
+            have c := set.subset_Union (signature.term.vars ∘ t_v) x,
             simp [den] at c,
             -- could have used the set lemma,
             -- but library search finished
             -- this one off.
             exact eq_bot_iff.mpr c,
         have ih := λ x, t_ih x (den_v x),
-        exact model.I₁ M t_f ih,
+        exact M.I₁ t_f ih,
     end
 
 def vasgn.bind (ass : vasgn) (x : ℕ) (val : α) : vasgn :=
     λy, if y = x then val else ass y
 
-def model.satisfies' : model → formula → vasgn → Prop
-| M (formula.relational r v) asg := 
+def signature.structure.satisfies' : σ.structure α →  σ.formula → vasgn → Prop
+| M ( signature.formula.relational r v) asg := 
           M.I₂ r $ λm,  M.reference' (v m) asg
-| M (formula.for_all x φ) ass :=
+| M ( signature.formula.for_all x φ) ass :=
     ∀ (a : α), M.satisfies' φ (ass.bind x a)
-| M (formula.if_then φ ψ) asg :=
+| M ( signature.formula.if_then φ ψ) asg :=
     let x := M.satisfies' φ asg,
         y := M.satisfies' ψ asg
     in x → y
-| M (formula.equation t₁ t₂) asg := 
+| M ( signature.formula.equation t₁ t₂) asg := 
     let x := M.reference' t₁ asg,
         y := M.reference' t₂ asg
     in x = y
-| M formula.false _ := false
+| M  signature.formula.false _ := false
 
 
 @[reducible]
-def model.satisfies : model → formula → Prop
+def signature.structure.satisfies : σ.structure α →  σ.formula → Prop
 | M φ := ∀ (ass : vasgn), M.satisfies' φ ass
 
-local infixr `⊨₁`:55 := model.satisfies
+local infixr `⊨₁`:55 := signature.structure.satisfies
 -- local infixr `⊢`:55 := proof
 
-lemma false_is_unsat : ¬∃ M : model, M ⊨₁ formula.false :=
+lemma false_is_unsat : ¬∃ M : σ.structure α, M ⊨₁  signature.formula.false :=
 begin
     intro h,
     obtain ⟨M, h⟩ := h,
@@ -560,13 +560,14 @@ begin
     exact h (λ_, x),
 end
 
-def model.for : model → set formula → Prop
+def signature.structure.for : σ.structure α → set  σ.formula → Prop
 | M Γ := ∀ φ ∈ Γ, M ⊨₁ φ
 
 -- semantic consequence
 -- remember Γ and φ are already defined
 def theory.follows : Prop :=
-    ∀ (M : model) ass, (∀ ψ ∈ Γ, M.satisfies' ψ ass) → M.satisfies' φ ass
+    ∀ (M : σ.structure α) (ass : vasgn),
+      (∀ ψ ∈ Γ, M.satisfies' ψ ass) → M.satisfies' φ ass
 
 local infixr `⊨`:55 := theory.follows
 
@@ -598,20 +599,20 @@ lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b}, (ass.bind x a).bind x b = ass
         simp[h],
     end
 
-lemma bind_term : ∀ {M:model} {ass :vasgn} {x : ℕ} {t : term} {a},
+lemma bind_term : ∀ {M : σ.structure α} {ass :vasgn} {x : ℕ} {t : σ.term} {a},
                   x ∉ t.vars →
                   M.reference' t (vasgn.bind ass x a) =
                   M.reference' t ass :=
 begin
     intros M ass x t a,
     induction t;
-    dunfold term.vars;
+    dunfold signature.term.vars;
     simp;
     intro h,
-        dunfold model.reference' vasgn.bind,
+        dunfold signature.structure.reference' vasgn.bind,
         simp [ne.symm h],
     cases t_n;
-        dunfold model.reference';
+        dunfold signature.structure.reference';
         simp,
     congr,
     ext y,
@@ -619,7 +620,7 @@ begin
     exact t_ih y h,
 end
 
-lemma bind₃ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
+lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : vasgn}{x : ℕ}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
@@ -627,7 +628,7 @@ lemma bind₃ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
 begin
     intros M φ ass x a,
     induction φ generalizing ass;
-    dunfold formula.free model.satisfies';
+    dunfold  signature.formula.free signature.structure.satisfies';
     simp;
     intros h₀,
     swap 3,
@@ -652,13 +653,13 @@ begin
             specialize h₀ y,
             revert h₀,
             induction φ_v y;
-            dunfold term.vars model.reference' vasgn.bind;
+            dunfold signature.term.vars signature.structure.reference' vasgn.bind;
             intro h₀,
                 simp at h₀,
                 replace h₀ := ne.symm h₀,
                 simp [h₀],
             cases n;
-                dunfold model.reference',
+                dunfold signature.structure.reference',
                 refl,
             simp at *,
             congr,
@@ -697,7 +698,7 @@ begin
         rw [bind_term h₀, bind_term h₁],
 end
 
-lemma fundamental : ∀ y x (M : model) ass, abstract_in y Γ → 
+lemma fundamental : ∀ y x (M : σ.structure α) ass, abstract_in y Γ → 
             (∀ φ ∈ Γ, M.satisfies' φ ass) →
             ( ∀φ ∈ Γ, M.satisfies' φ (ass.bind y x))
             :=
@@ -710,27 +711,27 @@ begin
     exact (bind₃ h₁).2 h₂,
 end
 
-lemma term_rw_semantics : ∀ {M:model} {ass:vasgn} {x} {t₁ t₂ : term},
+lemma term_rw_semantics : ∀ {M : σ.structure α} {ass:vasgn} {x} {t₁ t₂ : σ.term},
                           M.reference' (t₁.rw x t₂) ass =
                           M.reference' t₁ (ass.bind x (M.reference' t₂ ass))
                           :=
 begin
     intros M ass x t₁ t₂,
     induction t₁,
-        dunfold term.rw model.reference',
+        dunfold signature.term.rw signature.structure.reference',
         by_cases x = t₁;
             simp [vasgn.bind, h],
-        dunfold model.reference',
+        dunfold signature.structure.reference',
         simp [ne.symm h],
     cases t₁_n;
-        dunfold term.rw model.reference';
+        dunfold signature.term.rw signature.structure.reference';
         simp,
     congr,
     ext y,
     exact t₁_ih y,
 end
 
-lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
+lemma rw_semantics : ∀ {M : σ.structure α} {ass:vasgn} {x t} {φ: σ.formula},
                      φ.substitutable x t →
                      (M.satisfies' (φ.rw x t) ass ↔
                      M.satisfies' φ (ass.bind x (M.reference' t ass))) 
@@ -738,7 +739,7 @@ lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
 begin
     intros M ass x t φ,
     induction φ generalizing ass;
-    dunfold formula.substitutable formula.rw model.satisfies';
+    dunfold  signature.formula.substitutable  signature.formula.rw signature.structure.satisfies';
     try{simp},
     focus {
         constructor;
@@ -747,16 +748,16 @@ begin
         convert h,
         ext y,
         induction φ_v y;
-        dunfold term.rw model.reference' vasgn.bind,
+        dunfold signature.term.rw signature.structure.reference' vasgn.bind,
             by_cases eq : a = x;
                 simp [eq],
             replace eq := ne.symm eq,
             simp [eq],
-            dunfold model.reference',
+            dunfold signature.structure.reference',
             refl,
         simp,
         cases n;
-            dunfold model.reference';
+            dunfold signature.structure.reference';
             simp,
         congr,
         ext z,
@@ -770,7 +771,7 @@ begin
         simp [c],
         cases h,
             revert h,
-            dunfold formula.free,
+            dunfold  signature.formula.free,
             simp_intros h,
             classical,
             replace h : x ∉ φ_a_1.free,
@@ -826,7 +827,7 @@ begin
     have c₁ := proof_ih_h₁ ass h,
     have c₂ := proof_ih_h₂ ass h,
     revert c₁,
-    dunfold model.satisfies',
+    dunfold signature.structure.satisfies',
     simp,
     intro c₁,
     exact c₁ c₂,
@@ -851,7 +852,7 @@ begin
     rename proof_sub sub,
     clear proof_ih,
     revert ih,
-    dunfold model.satisfies',
+    dunfold signature.structure.satisfies',
     intro ih,
     set ref := M.reference' proof_t ass,
     specialize ih ref,
@@ -860,21 +861,21 @@ begin
     exfalso,
     have ih := proof_ih ass h,
     revert ih,
-    dunfold model.satisfies',
+    dunfold signature.structure.satisfies',
     contradiction,
     -- case by contradiction
     classical,
     by_contradiction,
     have ih := proof_ih ass h,
     revert ih,
-    dunfold formula.not model.satisfies',
+    dunfold  signature.formula.not signature.structure.satisfies',
     simp,
     intro ih,
     apply ih,
     intro insanity,
     contradiction,
     -- case identity intro
-    dunfold model.satisfies',
+    dunfold signature.structure.satisfies',
     simp,
     -- case identity elimination
     have ih₁ := proof_ih_h ass h,
@@ -885,24 +886,24 @@ begin
     apply (rw_semantics sub₂).2,
     convert ih₁ using 2,
     revert ih₂,
-    dunfold model.satisfies',
+    dunfold signature.structure.satisfies',
     simp,
     intro ih₂,
     rw ←ih₂,
 end
 
 
--- instance model_inh : nonempty model := sorry
+-- instance signature.structure_inh : nonempty signature.structure := sorry
 
 -- theorem consistency : consistent ∅ :=
 -- begin
 --     intro h,
---     replace h := soundness ∅ formula.false h,
---     have M : model := sorry,
+--     replace h := soundness ∅  signature.formula.false h,
+--     have M : signature.structure := sorry,
 --     have ass : vasgn := sorry,
 --     specialize h M ass,
 --     revert h,
---     dunfold model.satisfies',
+--     dunfold signature.structure.satisfies',
 --     simp,
 -- end
 
