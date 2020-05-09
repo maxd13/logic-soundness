@@ -289,73 +289,102 @@ lemma trivial_formula_rw : ∀ {φ:formula} {x}, φ.rw x (term.var x) = φ :=
         assumption,
     end
 
--- deductive consequence of formulas: Γ ⊢ φ
-inductive entails : set formula → formula → Prop
-| reflexivity (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : entails Γ φ
+-- deductive consequence of formulas: Γ ⊢ φ.
+-- Type of proofs from Γ to φ.
+inductive proof : set formula → formula → Type u
+| reflexivity (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : proof Γ φ
 | transitivity (Γ Δ : set formula) (φ : formula)
-               (h₁ : ∀ ψ ∈ Δ, entails Γ ψ)
-               (h₂ : entails Δ φ) :  entails Γ φ
+               (h₁ : ∀ ψ ∈ Δ, proof Γ ψ)
+               (h₂ : proof Δ φ) :  proof Γ φ
 | modus_ponens
             (φ ψ : formula) (Γ : set formula)
-            (h₁ : entails Γ (φ ⇒ ψ))
-            (h₂ : entails Γ φ)
-             : entails Γ ψ
+            (h₁ : proof Γ (φ ⇒ ψ))
+            (h₂ : proof Γ φ)
+             : proof Γ ψ
 | intro
             (φ ψ : formula) (Γ : set formula)
-            (h : entails (Γ ∪ {φ}) ψ)
-             : entails Γ (φ ⇒ ψ)
+            (h : proof (Γ ∪ {φ}) ψ)
+             : proof Γ (φ ⇒ ψ)
 | for_all_intro
             (Γ : set formula) (φ : formula)
             (x : ℕ) (xf : x ∈ φ.free)
             (abs : abstract_in x Γ)
-            (h : entails Γ φ)
-             : entails Γ (formula.for_all x φ)
+            (h : proof Γ φ)
+             : proof Γ (formula.for_all x φ)
 | for_all_elim
             (Γ : set formula) (φ : formula)
             (x : ℕ) --(xf : x ∈ φ.free)
             (t : term) (sub : φ.substitutable x t)
-            (h : entails Γ (formula.for_all x φ))
-             : entails Γ (φ.rw x t)
+            (h : proof Γ (formula.for_all x φ))
+             : proof Γ (φ.rw x t)
 | exfalso (Γ : set formula) (φ : formula)
-          (h : entails Γ formula.false)
-          : entails Γ φ
+          (h : proof Γ formula.false)
+          : proof Γ φ
 | by_contradiction (Γ : set formula) (φ : formula)
-                   (h : entails Γ φ.not.not)
-                   : entails Γ φ
+                   (h : proof Γ φ.not.not)
+                   : proof Γ φ
 | identity_intro
             (Γ : set formula) (t : term)
-             : entails Γ (formula.equation t t)
+             : proof Γ (formula.equation t t)
 | identity_elim 
             (Γ : set formula) (φ : formula)
             (x : ℕ) (xf : x ∈ φ.free)
             (t₁ t₂: term)
             (sub₁ : φ.substitutable x t₁)
             (sub₂ : φ.substitutable x t₂)
-            (h : entails Γ (φ.rw x t₁))
-            (eq : entails Γ (formula.equation t₁ t₂))
-             : entails Γ (φ.rw x t₂)
+            (h : proof Γ (φ.rw x t₁))
+            (eq : proof Γ (formula.equation t₁ t₂))
+             : proof Γ (φ.rw x t₂)
 
-local infixr `⊢`:55 := entails
+local infixr `⊢`:55 := proof
 
 variables (Γ Δ : set formula) (φ : formula)
 
 theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
 begin
-    apply entails.intro,
-    apply entails.reflexivity (Γ∪{φ}) φ,
+    apply proof.intro,
+    apply proof.reflexivity (Γ∪{φ}) φ,
     simp
 end
 
 theorem monotonicity : Δ ⊆ Γ → Δ ⊢ φ → Γ ⊢ φ :=
 begin
     intros H h,
-    have c₁ : ∀ ψ ∈ Δ, entails Γ ψ,
+    have c₁ : ∀ ψ ∈ Δ, proof Γ ψ,
         intros ψ hψ,
-        apply entails.reflexivity Γ ψ,
+        apply proof.reflexivity Γ ψ,
         exact H hψ,
-    apply entails.transitivity;
+    apply proof.transitivity;
     assumption,
 end 
+
+
+-- This depends on syntatical equality between formulas
+-- being decidable, which in turn depends on the equality of
+-- functional and relational symbols being decidable.
+-- def proof.premisses : Γ ⊢ φ → list (subtype Γ) :=
+--     begin
+--         intros h,
+--         induction h,
+--         -- case reflexivity
+--         exact [⟨h_φ, h_h⟩],
+--         -- case transitivity
+--         rename h_ih_h₁ ih₁,
+--         induction h_ih_h₂,
+--             exact [],
+--         obtain ⟨ψ, H⟩ := h_ih_h₂_hd,
+--         specialize ih₁ ψ H,
+--         exact ih₁ ++ h_ih_h₂_ih,
+--         -- case modus ponens
+--         exact h_ih_h₁ ++ h_ih_h₂,
+--         -- case intro
+--         set t : set formula := h_Γ ∪ {h_φ},
+--         have ct : h_φ ∈ t, simp,
+--         let c : subtype t := ⟨h_φ, ct⟩,
+--         all_goals{admit},
+--     end
+
+
 
 -- open finset
 
@@ -363,19 +392,19 @@ end
 
 -- #find ∀ _ ∈ _, ∃ _, _
 
-def list.to_set : list formula → set formula
-| [] := ∅
-| (φ::xs) := {φ} ∪ xs.to_set
+-- def list.to_set : list formula → set formula
+-- | [] := ∅
+-- | (φ::xs) := {φ} ∪ xs.to_set
 
-def proof : list formula → Prop
-| [] := false
-| (ψ::[]) := ψ ∈ Γ ∨ ∅ ⊢ ψ
-| (ψ::xs) := (ψ ∈ Γ ∨ list.to_set xs ⊢ ψ) ∧ 
-             proof xs
+-- def proof : list formula → Prop
+-- | [] := false
+-- | (ψ::[]) := ψ ∈ Γ ∨ ∅ ⊢ ψ
+-- | (ψ::xs) := (ψ ∈ Γ ∨ list.to_set xs ⊢ ψ) ∧ 
+--              proof xs
 
-def proof_of (φ) : list formula → Prop
-| [] := false
-| (ψ::xs) := ψ = φ ∧ proof Γ (ψ::xs)
+-- def proof_of (φ) : list formula → Prop
+-- | [] := false
+-- | (ψ::xs) := ψ = φ ∧ proof Γ (ψ::xs)
 
 -- theorem finite_proofs :  Γ ⊢ φ → ∃ xs : list formula, proof_of Γ φ xs :=
 -- begin
@@ -406,11 +435,11 @@ def proof_of (φ) : list formula → Prop
 --     induction h,
 --     -- case reflexivity
 --     existsi finset.singleton h_φ,
---     simp [entails.reflexivity],
+--     simp [proof.reflexivity],
 --     assumption,
 --     -- case transitivity
 --     obtain ⟨Δ, HΔ, hΔ⟩ := h_ih_h₂,
---     -- have c : ∀ ψ ∈ Δ, ∃ (Δ₂ : finset formula), ↑Δ₂ ⊆ h_Γ ∧ entails ↑Δ₂ ψ,
+--     -- have c : ∀ ψ ∈ Δ, ∃ (Δ₂ : finset formula), ↑Δ₂ ⊆ h_Γ ∧ proof ↑Δ₂ ψ,
 --     --     intros ψ Hψ,
 --     --     exact h_ih_h₁ ψ (HΔ Hψ),
 --     -- have c := λ ψ ∈ Δ, classical.subtype_of_exists (h_ih_h₁ ψ (HΔ _)),
@@ -433,7 +462,7 @@ def proof_of (φ) : list formula → Prop
 -- end
 
 -- Doesn't need to be defined just for theories
-def consistent (Γ : set formula) := ¬ Γ ⊢ formula.false
+def consistent (Γ : set formula) := ¬ nonempty (Γ ⊢ formula.false)
 
 -- At any rate we can define it for theories as well.
 def theory := subtype {Γ : set formula | ∀ φ, Γ ⊢ φ → φ ∈ Γ}
@@ -520,7 +549,7 @@ def model.satisfies : model → formula → Prop
 | M φ := ∀ (ass : vasgn), M.satisfies' φ ass
 
 local infixr `⊨₁`:55 := model.satisfies
--- local infixr `⊢`:55 := entails
+-- local infixr `⊢`:55 := proof
 
 lemma false_is_unsat : ¬∃ M : model, M ⊨₁ formula.false :=
 begin
@@ -785,17 +814,17 @@ end
 -- So pretty.
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
 begin
-    intros entails M ass h,
-    induction entails generalizing ass,
+    intros proof M ass h,
+    induction proof generalizing ass,
     -- case reflexivity
-    exact h entails_φ entails_h,
+    exact h proof_φ proof_h,
     -- case transitivity
-    apply entails_ih_h₂,
+    apply proof_ih_h₂,
     intros ψ H,
-    exact entails_ih_h₁ ψ H ass h,
+    exact proof_ih_h₁ ψ H ass h,
     -- case modus ponens
-    have c₁ := entails_ih_h₁ ass h,
-    have c₂ := entails_ih_h₂ ass h,
+    have c₁ := proof_ih_h₁ ass h,
+    have c₂ := proof_ih_h₂ ass h,
     revert c₁,
     dunfold model.satisfies',
     simp,
@@ -803,7 +832,7 @@ begin
     exact c₁ c₂,
     -- case intro
     intro h₂,
-    have sat := entails_ih,
+    have sat := proof_ih,
     apply sat,
     intros ψ H,
     cases H,
@@ -812,31 +841,31 @@ begin
     rwa H,
     -- case universal intro
     intro x,
-    have c := fundamental entails_Γ entails_x x,
-    specialize c M ass entails_abs h,
-    have ih := entails_ih (ass.bind entails_x x),
+    have c := fundamental proof_Γ proof_x x,
+    specialize c M ass proof_abs h,
+    have ih := proof_ih (ass.bind proof_x x),
     apply ih,
     exact c,
     -- case universal elim
-    have ih := entails_ih ass h,
-    rename entails_sub sub,
-    clear entails_ih,
+    have ih := proof_ih ass h,
+    rename proof_sub sub,
+    clear proof_ih,
     revert ih,
     dunfold model.satisfies',
     intro ih,
-    set ref := M.reference' entails_t ass,
+    set ref := M.reference' proof_t ass,
     specialize ih ref,
     exact (rw_semantics sub).2 ih,
     -- case exfalso
     exfalso,
-    have ih := entails_ih ass h,
+    have ih := proof_ih ass h,
     revert ih,
     dunfold model.satisfies',
     contradiction,
     -- case by contradiction
     classical,
     by_contradiction,
-    have ih := entails_ih ass h,
+    have ih := proof_ih ass h,
     revert ih,
     dunfold formula.not model.satisfies',
     simp,
@@ -848,10 +877,10 @@ begin
     dunfold model.satisfies',
     simp,
     -- case identity elimination
-    have ih₁ := entails_ih_h ass h,
-    have ih₂ := entails_ih_eq ass h,
-    rename entails_sub₁ sub₁,
-    rename entails_sub₂ sub₂,
+    have ih₁ := proof_ih_h ass h,
+    have ih₂ := proof_ih_eq ass h,
+    rename proof_sub₁ sub₁,
+    rename proof_sub₂ sub₂,
     replace ih₁ := (rw_semantics sub₁).mp ih₁,
     apply (rw_semantics sub₂).2,
     convert ih₁ using 2,
