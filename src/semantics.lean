@@ -100,13 +100,13 @@ def signature.structure.for : σ.structure α → set  σ.formula → Prop
 variables (Γ : set σ.formula) (φ : σ.formula)
 
 -- semantic consequence
-def theory.follows : Prop :=
-    ∀ (M : σ.structure α) (ass : σ.vasgn α),
-      (∀ ψ ∈ Γ, M.satisfies' ψ ass) → M.satisfies' φ ass
+def signature.follows (σ : signature) (Γ : set σ.formula) (φ : σ.formula) : Prop :=
+    ∀{α : Type u}[h : nonempty α] (M : @signature.structure σ α h) (ass : σ.vasgn α),
+      (∀ ψ ∈ Γ, @signature.structure.satisfies' σ α h M ψ ass) → @signature.structure.satisfies' σ α h M φ ass
 
-local infixr `⊨`:55 := @theory.follows σ α _
+local infixr `⊨`:55 := signature.follows σ
 
-#check theory.follows
+#check signature.follows
 
 lemma bind_symm : ∀ {ass : σ.vasgn α} {x y : σ.vars} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a :=
     begin
@@ -354,7 +354,7 @@ local infixr `⊢`:55 := proof
 -- So pretty.
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
 begin
-    intros proof M ass h,
+    intros proof α ne M ass h,
     induction proof generalizing ass,
     -- case reflexivity
     exact h proof_φ proof_h,
@@ -381,9 +381,9 @@ begin
     rwa H,
     -- case universal intro
     intro x,
-    have c := fundamental proof_Γ proof_x x,
+    have c := @fundamental σ α ne proof_Γ proof_x x,
     specialize c M ass proof_abs h,
-    have ih := proof_ih (ass.bind proof_x x),
+    have ih := proof_ih (@signature.vasgn.bind σ α ne ass proof_x x),
     apply ih,
     exact c,
     -- case universal elim
@@ -393,9 +393,9 @@ begin
     revert ih,
     dunfold signature.structure.satisfies',
     intro ih,
-    set ref := M.reference' proof_t ass,
+    set ref := @signature.structure.reference' σ α ne M proof_t ass,
     specialize ih ref,
-    exact (rw_semantics sub).2 ih,
+    exact (@rw_semantics σ α ne M ass proof_x proof_t proof_φ sub).2 ih,
     -- case exfalso
     exfalso,
     have ih := proof_ih ass h,
@@ -421,7 +421,7 @@ begin
     have ih₂ := proof_ih_eq ass h,
     rename proof_sub₁ sub₁,
     rename proof_sub₂ sub₂,
-    replace ih₁ := (rw_semantics sub₁).mp ih₁,
+    replace ih₁ := (@rw_semantics σ α ne M ass proof_x proof_t₁ proof_φ sub₁).mp ih₁,
     apply (rw_semantics sub₂).2,
     convert ih₁ using 2,
     revert ih₂,

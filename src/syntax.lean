@@ -8,13 +8,15 @@ namespace logic
 
 open list tactic set
 
-structure signature :=
+structure signature : Type (u+1) :=
     (functional_symbol : Type u)
     (relational_symbol : Type u)
+    (modality : Type u)
     (vars : Type u) 
     (dec_vars : decidable_eq vars)
     (arity : functional_symbol → ℕ)
     (rarity : relational_symbol → ℕ)
+    (marity : modality → ℕ)
 
 class signature.symbolic (σ : signature) :=
     (dec_fun : decidable_eq σ.functional_symbol)
@@ -25,27 +27,29 @@ instance dec_vars  (σ : signature) : decidable_eq σ.vars := σ.dec_vars
 instance dec_fun (σ : signature) [h : σ.symbolic] : decidable_eq σ.functional_symbol := h.dec_fun
 instance dec_rel (σ : signature) [h : σ.symbolic] : decidable_eq σ.relational_symbol := h.dec_rel
 
-structure varless_signature :=
+structure simple_signature :=
     (functional_symbol : Type u)
     (relational_symbol : Type u)
     (arity : functional_symbol → ℕ)
     (rarity : relational_symbol → ℕ)
 
-def varless_signature.up (σ : varless_signature) : signature := 
+def simple_signature.up (σ : simple_signature) : signature := 
 { functional_symbol := σ.functional_symbol,
   relational_symbol := σ.relational_symbol,
+  modality := empty,
   vars := ℕ,
   dec_vars := by apply_instance,
   arity := σ.arity,
-  rarity := σ.rarity 
+  rarity := σ.rarity,
+  marity := λ_, 0
 }
 
-instance varless_signature_inhabited : inhabited varless_signature :=
+instance simple_signature_inhabited : inhabited simple_signature :=
     ⟨⟨pempty, pempty, (λ_, 0), (λ_, 0)⟩⟩
 
 -- empty signature
 instance signature_inhabited : inhabited signature :=
-    ⟨(default varless_signature).up⟩
+    ⟨(default simple_signature).up⟩
 
 variable {σ : signature}
 
