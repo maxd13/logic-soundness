@@ -33,6 +33,8 @@ structure simple_signature :=
     (arity : functional_symbol → ℕ)
     (rarity : relational_symbol → ℕ)
 
+
+-- will convert to a lift or coe whenever I have the need of it
 def simple_signature.up (σ : simple_signature) : signature := 
 { functional_symbol := σ.functional_symbol,
   relational_symbol := σ.relational_symbol,
@@ -51,6 +53,21 @@ instance simple_signature_inhabited : inhabited simple_signature :=
 instance signature_inhabited : inhabited signature :=
     ⟨(default simple_signature).up⟩
 
+
+-- The signature whose formulas are propositional formulas built up
+-- from taking the instances of type α as propositional variables.
+
+def propositional_signature (α : Type u) : signature := 
+{ functional_symbol := pempty,
+  relational_symbol := α,
+  modality := pempty,
+  vars := pempty,
+  dec_vars := by apply_instance,
+  arity := (λ_, 0),
+  rarity := (λ_, 0),
+  marity := (λ_, 0)
+}
+
 variable {σ : signature}
 
 -- arity types
@@ -66,7 +83,7 @@ inductive signature.term (σ : signature)
 | app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
 
 -- constant terms.
-def signature.nary.term : σ.const → σ.term
+def signature.cterm (σ : signature) : σ.const → σ.term
 | c := term.app c fin_zero_elim
 
 @[reducible]
@@ -228,6 +245,21 @@ def  signature.formula.closed :  σ.formula → Prop
 
 def  signature.formula.open :  σ.formula → Prop
 | φ := ¬ φ.closed
+
+-- atomic and molecular formulas
+
+def signature.formula.atomic :  σ.formula → bool
+| (formula.relational r v) := tt
+| (formula.equation t₁ t₂) := tt
+| formula.false := tt
+| _ := ff
+
+def signature.formula.molecular : σ.formula → bool
+| (formula.for_all x φ) := ff
+| (formula.if_then φ ψ) := φ.molecular && ψ.molecular
+| _ := tt
+
+def signature.proposition (σ : signature) := subtype {φ : σ.formula | φ.molecular}
 
 def  signature.formula.vars :  σ.formula → set σ.vars
 | ( signature.formula.for_all x φ) := φ.free ∪ {x}
