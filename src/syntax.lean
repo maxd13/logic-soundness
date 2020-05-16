@@ -10,7 +10,6 @@ open list tactic set
 -- The type of signatures, which defines a first-order language,
 -- possibly with extra modalities, and with room for defining your
 -- own preferred variable type.
-
 @[derive inhabited]
 structure signature : Type (u+1) :=
     (functional_symbol : Type u := pempty)
@@ -41,21 +40,26 @@ instance dec_mod (σ : signature) [h : σ.symbolic] : decidable_eq σ.modality :
 
 -- The signature whose formulas are propositional formulas built up
 -- from taking the instances of type α as propositional variables.
-
-def propositional_signature (α : Type u) : signature := 
+def propositional_signature (α : Type u := ulift ℕ) : signature := 
 { 
   relational_symbol := α,
   vars := pempty,
   dec_vars := by apply_instance,
 }
 
+-- here we start with the syntactical definitions
 variable {σ : signature}
 
 -- arity types
-def is_constant (f : σ.functional_symbol) := σ.arity f = 0
+
+-- the type of functional symbols of arity n
 def signature.nary (σ : signature) (n : ℕ) := subtype {f : σ.functional_symbol | σ.arity f = n}
+
+-- the type of relational symbols of arity n
 def signature.nrary (σ : signature) (n : ℕ) := subtype {r : σ.relational_symbol | σ.rarity r = n}
-@[reducible]
+
+-- the predicate defining, and the type of, constants
+def is_constant (f : σ.functional_symbol) := σ.arity f = 0
 def signature.const (σ : signature) := σ.nary 0
 
 -- terms in the language
@@ -63,35 +67,38 @@ inductive signature.term (σ : signature)
 | var : σ.vars → signature.term
 | app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
 
--- constant terms.
+-- constant terms. A function that lifts a constant to a term.
 def signature.cterm (σ : signature) : σ.const → σ.term
 | c := term.app c fin_zero_elim
 
-@[reducible]
+-- Rewrite a variable for a term in a term.
+-- This is also called a substitution of a variable for a term.
 def signature.term.rw : σ.term → σ.vars → σ.term → σ.term
 | (term.var a) x t := if x = a then t else term.var a
 | (term.app f v) x t := 
     let v₂ := λ m, signature.term.rw (v m) x t in
     term.app f v₂
 
+-- Get the set of variables of a term.
 def signature.term.vars  : σ.term → set σ.vars
 | (term.var a) := {a}
 | (term.app f v) :=
     let v₂ := λ m, signature.term.vars (v m) in
     ⋃ m, v₂ m
 
+-- denotative and non-denotative terms.
 @[reducible]
 def signature.term.denotes (t : σ.term) : Prop := t.vars = (∅ : set σ.vars)
 @[reducible]
 def signature.term.conotes (t : σ.term) := ¬ t.denotes
 
+-- a closed term is a term in the Proper sense of the term (pun intended).
+def signature.pterm (σ : signature) := subtype {t : σ.term | t.denotes}
 
-#check signature.term.denotes
+-- an open term is an expression.
+def signature.expression (σ : signature) := subtype {t : σ.term | t.conotes}
 
--- a σ.term in the proper sense of the σ.term (pun intended).
-def signature.pterm (σ : signature) := subtype {t : σ.term | t.denotes}-- ∧ t.concrete}
-def signature.expression (σ : signature) := subtype {t : σ.term | t.conotes}-- ∧ t.concrete}
--- def cterm := subtype term.concrete
+-- some lemmas about term rewriting:
 
 theorem rw_eq_of_not_in_vars : ∀ (t₁ t₂ : σ.term) (x : σ.vars), x ∉ t₁.vars → t₁.rw x t₂ = t₁ :=
 begin
@@ -153,28 +160,36 @@ begin
         simp[c₂],
 end
 
+-- Some auxiliary functions about terms (mostly unused):
+
+-- subterms of a term.
 def signature.term.subterms : σ.term → set σ.term
 | (term.app f v) := 
     let v₂ := λ m, signature.term.subterms (v m) in
     (⋃ m, v₂ m) ∪ {(term.app f v)}
 | t := {t}
 
+
+-- set of all variables appearing in a list of terms.
 def list.vars : list σ.term → set σ.vars
 | [] := ∅
 | (hd :: tl) := hd.vars ∪ tl.vars
 
+-- subterms of a list of terms.
 def list.subterms : list σ.term → set σ.term
 | [] := ∅
 | (hd :: tl) := hd.subterms ∪ tl.subterms
 
+-- the same for sets.
+def subterms : set σ.term → set σ.term
+| S := ⋃ x ∈ S, signature.term.subterms x
+
+-- rewrite a variable in a list of terms.
 def list.rw : list σ.term → σ.vars → σ.term → list σ.term
 | [] _ _:= ∅
 | (hd :: tl) x t := (hd.rw x t) :: tl.rw x t
 
-def subterms : set σ.term → set σ.term
-| S := ⋃ x ∈ S, signature.term.subterms x
-
---  formulas
+--  the type of formulas in the language
 inductive  signature.formula (σ : signature)
 | relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
 | for_all :  σ.vars →  signature.formula →  signature.formula
@@ -182,19 +197,21 @@ inductive  signature.formula (σ : signature)
 | equation (t₁ t₂ : σ.term) :  signature.formula
 | false :  signature.formula
 
+-- a convenient notation to set up for if_then
 reserve infixr ` ⇒ `:55
 class has_exp (α : Type u) := (exp : α → α → α)
 infixr ⇒ := has_exp.exp
 
-instance  signature.formula.has_exp : has_exp  σ.formula := ⟨ signature.formula.if_then⟩
+instance  signature.formula.has_exp : has_exp  σ.formula := ⟨signature.formula.if_then⟩
 
+-- definition of connectives
 def  signature.formula.not (φ :  σ.formula)   := φ ⇒  signature.formula.false
 def  signature.formula.or  (φ ψ :  σ.formula) := φ.not ⇒ ψ
 def  signature.formula.and (φ ψ :  σ.formula) := (φ.not.or ψ.not).not
 def  signature.formula.iff (φ ψ :  σ.formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
+def  signature.formula.exists (φ : σ.formula) (x : σ.vars) := (signature.formula.for_all x φ.not).not
 
--- local notation `∼` :=  signature.formula.not
-
+-- Rewrite (substitute) a variable for a term in a formula.
 def  signature.formula.rw :  σ.formula → σ.vars → σ.term →  σ.formula
 | ( signature.formula.relational r v) x t :=
     let v₂ := λ m, (v m).rw x t in
@@ -214,9 +231,12 @@ def  signature.formula.free :  σ.formula → set σ.vars
 | ( signature.formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
 |  signature.formula.false := ∅
 
+-- definition of whether a variable is 
+-- substititutable for a term in a formula.
+-- Needed for proving some lemmas.
 def  signature.formula.substitutable  :  σ.formula → σ.vars → σ.term → Prop
 | ( signature.formula.for_all y φ) x t := x ∉ ( signature.formula.for_all y φ).free ∨
-                                (y ∉ t.vars ∧ φ.substitutable x t) 
+                                         (y ∉ t.vars ∧ φ.substitutable x t) 
 | ( signature.formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
 | _ _ _ := true
 
@@ -240,31 +260,41 @@ def signature.formula.molecular : σ.formula → bool
 | (formula.if_then φ ψ) := φ.molecular && ψ.molecular
 | _ := tt
 
+-- utility for propositional logic
 def signature.proposition (σ : signature) := subtype {φ : σ.formula | φ.molecular}
 
+-- variables present in a formula
 def  signature.formula.vars :  σ.formula → set σ.vars
 | ( signature.formula.for_all x φ) := φ.free ∪ {x}
 | ( signature.formula.if_then φ ψ) := φ.vars ∪ ψ.vars
 | φ := φ.free
 
+-- terms present in a formula
 def  signature.formula.terms :  σ.formula → set σ.term
 | ( signature.formula.relational r v) := list.subterms (of_fn v)
 | ( signature.formula.for_all x φ) := φ.terms ∪ {term.var x}
 | ( signature.formula.if_then φ ψ) := φ.terms ∪ ψ.terms
 | _ := ∅
 
+-- tells wether a term is present in a set of formulas.
+-- The name comes from the universal introduction rule, 
+-- where we prove that a formula is valid for an "abstract" 
+-- representative and conclude it is universally valid.
 def term.abstract_in : σ.term → set  σ.formula → Prop
 | t S := t ∉ (⋃ φ ∈ S,  signature.formula.terms φ)
 
-@[reducible]
+-- the same for variables.
 def abstract_in : σ.vars → set  σ.formula → Prop
 | x S := x ∉ (⋃ φ ∈ S,  signature.formula.free φ)
 
 -- construct the generalization of a  σ.formula from a list of variables.
--- This is just a fold but, I like being explicit in my folds when possible.
+-- This is just a fold but, I like being explicit about my folds when possible.
+-- Anyway, this ended up not being used so far.
 def  signature.formula.generalize :  σ.formula → list σ.vars →  σ.formula
 | φ [] := φ
 | φ (x::xs) :=  signature.formula.for_all x $ φ.generalize xs
+
+-- lemmas about rewriting in formulas:
 
 theorem formula_rw : ∀ {φ :  σ.formula} {x : σ.vars}, x ∉ φ.free → ∀(t : σ.term),φ.rw x t = φ :=
     begin
@@ -287,7 +317,6 @@ theorem formula_rw : ∀ {φ :  σ.formula} {x : σ.vars}, x ∉ φ.free → ∀
             specialize ih z,
             exact ih h,
         classical,
-        -- rename _inst_1 dont_annoy,
         by_cases eq₁ : x ∈ φ_a_1.free,
             simp [h eq₁],
         by_cases eq₂ : φ_a = x;
@@ -310,11 +339,8 @@ lemma trivial_formula_rw : ∀ {φ: σ.formula} {x}, φ.rw x (term.var x) = φ :
     begin
         intros φ x,
         induction φ;
-        -- tactic.unfreeze_local_instances,
         dunfold  signature.formula.rw;
         try{simp},
-        -- any_goals{assumption},
-            -- convert h,
             ext,
             induction (φ_v x_1);
             dunfold signature.term.rw,
@@ -332,10 +358,10 @@ lemma trivial_formula_rw : ∀ {φ: σ.formula} {x}, φ.rw x (term.var x) = φ :
         assumption,
     end
 
-#check σ.formula
-
--- deductive consequence of  σ.formulas: Γ ⊢ φ.
+-- deductive consequence of formulas: Γ ⊢ φ.
 -- Type of proofs from Γ to φ.
+-- The universe var here has been automatically generated,
+-- I don't want to bother naming this properly right now.
 inductive proof : set  σ.formula →  σ.formula → Type u_1
 | reflexivity (Γ : set  σ.formula) (φ :  σ.formula)(h : φ ∈ Γ) : proof Γ φ
 | transitivity (Γ Δ : set  σ.formula) (φ :  σ.formula)
@@ -383,6 +409,8 @@ inductive proof : set  σ.formula →  σ.formula → Type u_1
 
 local infixr `⊢`:55 := proof
 
+-- Some simple (meta-)theorems:
+
 variables (Γ Δ : set  σ.formula) (φ :  σ.formula)
 
 theorem self_entailment : Γ ⊢ (φ ⇒ φ) :=
@@ -403,10 +431,16 @@ begin
     assumption,
 end 
 
+-- The following commented code chunks are unfinished attempts
+-- to prove that proofs are finite:
 
--- This depends on syntatical equality between  σ.formulas
+-- This one depends on syntatical equality between σ.formulas
 -- being decidable, which in turn depends on the equality of
--- functional and relational symbols being decidable.
+-- functional and relational symbols being decidable 
+-- (i.e. σ must be "symbolic"). We will probably move this
+-- to another module to deal with "symbolic" signatures later.
+
+-- extracts the premisses (∈ Γ) use to prove φ from Γ.
 -- def proof.premisses : Γ ⊢ φ → list (subtype Γ) :=
 --     begin
 --         intros h,
@@ -429,6 +463,9 @@ end
 --         all_goals{admit},
 --     end
 
+
+-- This here are earlier attempts squash proof trees either as lists
+-- or finsets.
 
 
 -- open finset
@@ -506,10 +543,11 @@ end
 
 -- end
 
--- Doesn't need to be defined just for theories
+-- Consistency doesn't need to be defined just for theories.
 def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
 
 -- At any rate we can define it for theories as well.
+-- Here is the definition of a theory:
 def signature.theory (σ : signature) := subtype {Γ : set  σ.formula | ∀ φ, Γ ⊢ φ → φ ∈ Γ}
 
 def theory.consistent (Γ : σ.theory) := consistent Γ.val
