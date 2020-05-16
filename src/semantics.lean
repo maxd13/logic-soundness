@@ -2,9 +2,10 @@ import syntax
 universe u
 
 namespace logic
--- namespace semantics
+-- namespace semantics (have to figure out how to use nested namespaces properly)
 open list tactic set
 
+-- a structure for the language define by σ, with domain in type α.
 structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
     -- functional interpretation
     (I₁ : Π {n}, σ.nary n → (fin n → α) → α)
@@ -12,23 +13,24 @@ structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
     (I₂ : Π {n}, σ.nrary n → (fin n → α) → Prop)
 
 variables {σ : signature} {α : Type u} [nonempty α]
--- variable assignment
+
+-- type of variable assignments
 def signature.vasgn (σ : signature) (α : Type u) := σ.vars → α
 
-#check signature.term.var
-
--- @[reducible]
+-- the reference of a term in a structure relative to an assignment.
 def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
 | (signature.term.var x) asg := asg x
 | (@signature.term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
 | (@signature.term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
                                     in M.I₁ f v₂
 
-
-#check signature.structure.reference'
-
+-- The reference of a denotative term is independent from an assignment.
+-- Note: We adopt the convention that functions ending with ' 
+-- depend on assgnments, and others do not.
 def signature.structure.reference (M : σ.structure α) : σ.pterm → α :=
     begin
+        -- Although idk if it is a good idea to define functions using tactics.
+        -- What happens if I unfold their definitions later?
         intro t,
         obtain ⟨t, den⟩ := t,
         induction t,
@@ -59,9 +61,14 @@ def signature.structure.reference (M : σ.structure α) : σ.pterm → α :=
         exact M.I₁ t_f ih,
     end
 
+-- bind the value of a variable to `val` in an assignment 
+-- (generates a new assignment).
 def signature.vasgn.bind (ass : σ.vasgn α) (x : σ.vars) (val : α) : σ.vasgn α :=
     λy, if y = x then val else ass y
 
+
+-- tells whether a formula is true in a structure, relative to
+-- an assignment.
 def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasgn α → Prop
 | M ( signature.formula.relational r v) asg := 
           M.I₂ r $ λm,  M.reference' (v m) asg
@@ -78,13 +85,16 @@ def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasg
 | M  signature.formula.false _ := false
 
 
-@[reducible]
-def signature.structure.satisfies : σ.structure α →  σ.formula → Prop
+-- tells whether a formula is true in a structure, absolutely.
+def signature.structure.satisfies : σ.structure α → σ.formula → Prop
 | M φ := ∀ (ass : σ.vasgn α), M.satisfies' φ ass
 
-local infixr `⊨₁`:55 := signature.structure.satisfies
--- local infixr `⊢`:55 := proof
 
+-- will reserve ⊨ without subscript for 
+-- semantic consequence of theories.
+local infixr `⊨₁`:55 := signature.structure.satisfies
+
+-- so here is some easy corollary.
 lemma false_is_unsat : ¬∃ M : σ.structure α, M ⊨₁  signature.formula.false :=
 begin
     intro h,
@@ -94,19 +104,26 @@ begin
     exact h (λ_, x),
 end
 
-def signature.structure.for : σ.structure α → set  σ.formula → Prop
+-- tells whether a model satisfies a set of formulas. 
+-- Ended up being an useless definition so far.
+def signature.structure.for : σ.structure α → set σ.formula → Prop
 | M Γ := ∀ φ ∈ Γ, M ⊨₁ φ
 
 variables (Γ : set σ.formula) (φ : σ.formula)
 
--- semantic consequence
+-- semantic consequence.
+-- Tells whether φ is true in every model/assignment in which Γ is true.
+-- Ended up being a complex definition because of the synthesizer,
+-- maybe we can simplify it later?s
 def signature.follows (σ : signature) (Γ : set σ.formula) (φ : σ.formula) : Prop :=
     ∀{α : Type u}[h : nonempty α] (M : @signature.structure σ α h) (ass : σ.vasgn α),
       (∀ ψ ∈ Γ, @signature.structure.satisfies' σ α h M ψ ass) → @signature.structure.satisfies' σ α h M φ ass
 
 local infixr `⊨`:55 := signature.follows σ
 
-#check signature.follows
+-- Here we move closer to the proof itself.
+-- In order to prove it we need to prove several 
+-- auxiliary lemmas:
 
 lemma bind_symm : ∀ {ass : σ.vasgn α} {x y : σ.vars} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a :=
     begin
@@ -157,6 +174,10 @@ begin
     exact t_ih y h,
 end
 
+-- Somethings to note here:
+-- * It seems it would be impossible to prove this without generalizing the assignment in the induction.
+-- * It seems it would be impossible to prove just one side of the ↔ alone.
+-- * I've learned this the hard way.
 lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : σ.vasgn α}{x : σ.vars}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
@@ -208,7 +229,6 @@ begin
     intro h₁;
     intro a₂;
     classical;
-    -- rename _inst_1 dont_annoy,
     all_goals{
         by_cases (x ∈ φ_a_1.free),
             specialize h₁ a₂,
@@ -235,6 +255,9 @@ begin
         rw [bind_term h₀, bind_term h₁],
 end
 
+-- Here is the most important lemma I suppose.
+-- It's an easy corollary of the last one.
+-- That one was hard.
 lemma fundamental : ∀ y x (M : σ.structure α) ass, abstract_in y Γ → 
             (∀ φ ∈ Γ, M.satisfies' φ ass) →
             ( ∀φ ∈ Γ, M.satisfies' φ (ass.bind y x))
@@ -349,7 +372,12 @@ begin
     simp [term_rw_semantics],
 end
 
+-- We will generalize this notation to a typeclass later.
+-- For now it is a local notation in both modules.
 local infixr `⊢`:55 := proof
+
+-- And here is the proof itself. 
+-- It proceeds by induction on the proof Γ ⊢ φ.
 
 -- So pretty.
 theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
@@ -431,8 +459,7 @@ begin
     rw ←ih₂,
 end
 
-
--- instance signature.structure_inh : nonempty signature.structure := sorry
+-- This we will finish later... eventually.
 
 -- theorem consistency : consistent ∅ :=
 -- begin
