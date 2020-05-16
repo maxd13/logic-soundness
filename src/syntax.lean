@@ -5,67 +5,48 @@ universe u
 -- untyped first order predicate logic.
 
 namespace logic
-
 open list tactic set
 
-structure signature : Type (u+1) :=
-    (functional_symbol : Type u)
-    (relational_symbol : Type u)
-    (modality : Type u)
-    (vars : Type u) 
-    (dec_vars : decidable_eq vars)
-    (arity : functional_symbol → ℕ)
-    (rarity : relational_symbol → ℕ)
-    (marity : modality → ℕ)
+-- The type of signatures, which defines a first-order language,
+-- possibly with extra modalities, and with room for defining your
+-- own preferred variable type.
 
+@[derive inhabited]
+structure signature : Type (u+1) :=
+    (functional_symbol : Type u := pempty)
+    (relational_symbol : Type u := pempty)
+    (modality : Type u := pempty)
+    (vars : Type u := ulift ℕ) 
+    (dec_vars : decidable_eq vars . apply_instance)
+    (arity : functional_symbol → ℕ := λ_, 0)
+    (rarity : relational_symbol → ℕ := λ_, 0)
+    (marity : modality → ℕ := λ_, 0)
+
+-- A pseudo-predicate saying that the we can decide the equality
+-- between any symbols of the signature.
+-- Many definitions of proof theory need us to decide whether 
+-- 2 symbols are equal, but many also do not, which justifies us
+-- keeping this as a separate structure. 
 class signature.symbolic (σ : signature) :=
     (dec_fun : decidable_eq σ.functional_symbol)
     (dec_rel : decidable_eq σ.relational_symbol)
+    (dec_mod : decidable_eq σ.modality)
 
-
+-- decidable_eq instances that we get to infer from a 
+-- (symbolic) signature.
 instance dec_vars  (σ : signature) : decidable_eq σ.vars := σ.dec_vars 
 instance dec_fun (σ : signature) [h : σ.symbolic] : decidable_eq σ.functional_symbol := h.dec_fun
 instance dec_rel (σ : signature) [h : σ.symbolic] : decidable_eq σ.relational_symbol := h.dec_rel
-
-structure simple_signature :=
-    (functional_symbol : Type u)
-    (relational_symbol : Type u)
-    (arity : functional_symbol → ℕ)
-    (rarity : relational_symbol → ℕ)
-
-
--- will convert to a lift or coe whenever I have the need of it
-def simple_signature.up (σ : simple_signature) : signature := 
-{ functional_symbol := σ.functional_symbol,
-  relational_symbol := σ.relational_symbol,
-  modality := empty,
-  vars := ℕ,
-  dec_vars := by apply_instance,
-  arity := σ.arity,
-  rarity := σ.rarity,
-  marity := λ_, 0
-}
-
-instance simple_signature_inhabited : inhabited simple_signature :=
-    ⟨⟨pempty, pempty, (λ_, 0), (λ_, 0)⟩⟩
-
--- empty signature
-instance signature_inhabited : inhabited signature :=
-    ⟨(default simple_signature).up⟩
-
+instance dec_mod (σ : signature) [h : σ.symbolic] : decidable_eq σ.modality := h.dec_mod
 
 -- The signature whose formulas are propositional formulas built up
 -- from taking the instances of type α as propositional variables.
 
 def propositional_signature (α : Type u) : signature := 
-{ functional_symbol := pempty,
+{ 
   relational_symbol := α,
-  modality := pempty,
   vars := pempty,
   dec_vars := by apply_instance,
-  arity := (λ_, 0),
-  rarity := (λ_, 0),
-  marity := (λ_, 0)
 }
 
 variable {σ : signature}
