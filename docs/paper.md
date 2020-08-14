@@ -55,11 +55,12 @@
     }
 
     code {
-        font-size: 12pt;
+        font-size: 10pt;
     }
 
     pre {
-        page-break-inside: avoid;
+        /* page-break-inside: avoid; */
+        white-space: pre-wrap;
     }
     
 </style>
@@ -67,8 +68,8 @@
 <div id=title>Proving the consistency of Logic in Lean.</div>
 
 <div id=author>Luiz Carlos R. Viana</div>
-<div id=address>Departamento de Informática – Pontifícia Universidade Católica do Rio de Janeiro (PUC-RJ) 
-– <br/> Rio de Janeiro, RJ,  Brazil</div>
+<div id=address>Departamento de Informática -- Pontifícia Universidade Católica do Rio de Janeiro (PUC-RJ) 
+-- <br/> Rio de Janeiro, RJ,  Brazil</div>
 <div id=email>luizcarlosrvn424@gmail.com</div>
 
 <div id=abstract> <b>Abstract.</b> We implement classical first-order logic with equality in the Lean Interactive Theorem Prover (ITP), and prove its soundness relative to the usual semantics. As a corollary, we prove the consistency of the calculus.
@@ -76,15 +77,15 @@
 
 ## **Introduction**
 
-The advent of intuitionistic dependent type theories allowed the development of proof assistants for the formalization and computer-aided verification of mathematical proofs. These interactive proof systems allow the experienced user to prove just about any true theorem of mathematics which is at least already suspected in the literature to be true.
+The advent of intuitionistic dependent type theories allowed the development of proof assistants for the formalization and computer-aided verification of mathematical proofs. These interactive proof systems allow the experienced user to prove just about any theorem of mathematics. As explained in Martin-Löf's paper [1], by applying the Curry-Howard isomorphism between proofs in intuitionistic logic and terms in a typed lambda calculus, we can see any flavour of intuitionistic type theory to be a programming language whose programs are mathematical proofs. The Lean ITP, developed by Leonardo de Moura at Microsoft Research, is such a programming language: implementing intuitionistic type theory and the calculus of inductive constructions, Lean supports the engineering of complex proofs in all areas of mathematics. By default, Lean allows for the construction of proofs in intuitionistic logic, but by the declaration of the axiom of choice as an extra assumption of the theory, it also allows classical reasoning to take place. Since intuitionistic type theory with the axiom of choice is at least as expressive as classical ZFC set theory, it is very much well suited for use as a meta-language for the development of semantics for logical calculi. 
 
-&emsp; &emsp; As explained in Martin-Löf's paper [1], by applying the Curry-Howard isomorphism [2] between proofs in intuitionistic logic and terms in a typed lambda calculus, we can see any flavour of intuitionistic type theory to be a programming language whose programs are mathematical proofs. The Lean ITP, developed by Leonardo de Moura at Microsoft Research, is such a programming language: implementing intuitionistic type theory and the calculus of inductive constructions, Lean supports the engineering of complex proofs in all areas of mathematics in a way that resembles the more familiar forms of software development. By default, Lean allows for the construction of proofs in intuitionistic logic, but by the declaration of (the non-intuitionistic version of) the axiom of choice as an extra assumption of the theory, it also allows classical reasoning to take place. Since intuitionistic type theory with the axiom of choice is at least as expressive as classical ZFC set theory, it is very much well suited for use as a meta-language for the development of semantics for logical calculi. In fact the community-developed standard library [3] for the Lean prover implements an internal model of ZFC within Lean:
+<!-- In fact the community-developed standard library [3] for the Lean prover implements an internal model of ZFC within Lean:
 
 ```haskell
 -- The ZFC universe of sets consists of the type of pre-sets,
 -- quotiented by extensional equivalence.
 def Set : Type (u+1) := quotient pSet.setoid.{u}
-```
+``` -->
 <!-- 
 &emsp; &emsp; This goes to show not only that Lean is at least as expressive as ZFC, but also the consistency of ZFC relative to Lean.  -->
 
@@ -97,15 +98,17 @@ def Set : Type (u+1) := quotient pSet.setoid.{u}
 
 ## **Motivation of our Work**
 
-One general motivation for the development of interactive theorem provers is the formal verification of mathematical proofs such as Jordan's curve theorem and Fermat's last theorem, which are so large and complex that even expert mathematicians may have trouble understanding them, and for this reason may suspect them to be wrong. However, for simpler results, such as that of the soundness of first-order logic, even though a verification might provide greater security to some, there is already virtually no suspicion in the mathematical community that their canonical, more well-known, proofs might be wrong. So this reason would be very weak to motivate our research.
+<!-- One general motivation for the development of interactive theorem provers is the formal verification of mathematical proofs such as Jordan's curve theorem and Fermat's last theorem, which are so large and complex that even expert mathematicians may have trouble understanding them, and for this reason may suspect them to be wrong. However, for simpler results, such as that of the soundness of first-order logic, even though a verification might provide greater security to some, there is already virtually no suspicion in the mathematical community that their canonical, more well-known, proofs might be wrong. So this reason would be very weak to motivate our research. -->
 
-&emsp; &emsp; On the other hand, in the spirit of literate programming, we can set out to investigate the usability of these provers for teaching logic to students by providing a formalized reference of the subject and of its proofs, as a practical tool for the solution of mathematical exercises, and also as a means of teaching the formal verification of computer programs and their semantics. Already some courses of logic using Lean exist, such as the online book *Logic and Proof* [4], but we know of no logic course which teaches the soundness theorem by means of a deep embedding of the syntax of first-order logic within Lean, even though there are certainly papers [5] mentioning this construction has been achieved before. 
+<!-- On the other hand, -->
+
+In the spirit of literate programming, we can set out to investigate the usability of these provers for teaching logic to students by providing a formalized reference of the subject and of its proofs, as a practical tool for the solution of mathematical exercises, and also as a means of teaching the formal verification of computer programs and their semantics. Already some courses of logic using Lean exist, such as the online book *Logic and Proof* [2], but we know of no logic course which teaches the soundness theorem by means of a deep embedding of the syntax of first-order logic within Lean.
 
 <!-- We believe that presenting mathematical proofs as code makes the whole subject of mathematical proofs much more practical and concrete, just as an implementation of an algorithm expressed in pseudo-code   might make them clearer, at least to some people, which justifies the such attempts at teaching logic via Lean. -->
 
-&emsp; &emsp; With respect to exercises, a teacher in any area of mathematics can already write a class assignment in a proof assistant as a list of theorem declarations. A solution to the assignment consists in a proof of each theorem, which is then automatically checked by the software for correctness, requiring no further correction by a human being. An assignment can even be provided in a game-like format [8] and integrated with the theorem prover. The usage of proof assistants in mathematics is sure to save many teachers much time; furthermore, such usage is sure to spread the knowledge of formal methods and of logic itself to many people who might otherwise not have learnt it.
+&emsp; &emsp; With respect to exercises, a teacher in any area of mathematics can already write a class assignment in a proof assistant as a list of theorem declarations. A solution to the assignment consists in a proof of each theorem, which is then automatically checked by the software for correctness, requiring no further correction by a human being. An assignment can even be provided in a game-like format [3] and integrated with the theorem prover. The usage of proof assistants in mathematics is sure to save many teachers much time; furthermore, such usage is sure to spread the knowledge of formal methods and of logic itself to many people who might otherwise not have learnt it.
 
-&emsp; &emsp; Our implementation gives a basis for the creation of specialized exercise lists involving meta-theorems of first-order logic. The code can be reused as the basis of a book on meta-logic, or for the development of a general-purpose library for dealing with different logical formalisms as embedded languages of the prover; in particular Hoare logic [6], which is relevant for applications of Lean in software verification. It could also be used to prove the consistency of particular first-order theories via the soundness meta-theorem, by constructing models for them.
+&emsp; &emsp; Our implementation gives a basis for the creation of specialized exercise lists involving meta-theorems of first-order logic. The code can be reused as the basis of a book on meta-logic, or for the development of a general-purpose library for dealing with different logical formalisms as embedded languages of the prover; in particular Hoare logic, which is relevant for applications of Lean in software verification. It could also be used to prove the consistency of particular first-order theories via the soundness meta-theorem, by constructing models for them.
 
 <!-- - Teaching logic using interactive theorem provers
 - Solving math exercises in a prover allows for automatic correction.
@@ -116,18 +119,33 @@ One general motivation for the development of interactive theorem provers is the
 <!-- <div style="page-break-before: always;"> -->
 ## **Implementation**
 
-We implemented the different aspects of first order logic, dividing definitions and proofs into syntactical and semantical sections. We present a short summary of our implementation below.
+We implemented the different aspects of first order logic, dividing definitions and proofs into syntactical and semantical sections. In comparison with the Flypitch project [4], which also implements a deep embedding of logic within Lean, our approach was designed to be easier to read and much shorter, as it is only meant as a simple soundness proof; for this reason we also do not use De Brujin indices for variable binding. In comparison with implementations in other languages such as Isabelle/HOL, as can be seen in [6], our approach benefits from the usage of dependent types to provide greater generality in language definition. We also used dependent types for inductively defining a type of proofs, rather than using the approach in [6] of recursively defining whether a list of formulas is a proof or not. In our opinion this provides a cleaner implementation.
+
+&emsp; &emsp; We present a short summary of our implementation below. Due to limitations of space, we are not able to discuss the proofs in greater detail, but the github repository containing the whole code can be accessed from [5].
 
 ### **Syntactic Definitions**
 
-In our implementation, we assumed the existence of a type of functional symbols and a type of relational symbols as parameters, both accompanied by their respective arity functions:
+The most interesting aspect of our implementation is the usage of dependent types to provide a signature abstraction which can be reused for defining a variety of different formal languages:
 
 ```haskell
-parameter {functional_symbol : Type u}
-parameter {relational_symbol : Type u}
-parameter {arity : functional_symbol → ℕ}
-parameter {rarity : relational_symbol → ℕ}
+-- The type of signatures, which defines a first-order language,
+-- possibly with extra modalities, and with room for defining your
+-- own preferred variable type.
+@[derive inhabited]
+structure signature : Type (u+1) :=
+    (functional_symbol : Type u := pempty)
+    (relational_symbol : Type u := pempty)
+    (modality : Type u := pempty)
+    (vars : Type u := ulift ℕ) 
+    (dec_vars : decidable_eq vars . apply_instance)
+    (arity : functional_symbol → ℕ := λ_, 0)
+    (rarity : relational_symbol → ℕ := λ_, 0)
+    (marity : modality → ℕ := λ_, 0)
 ```
+
+&emsp; &emsp; The type of first-order formulas will later be defined in terms of a signature instance as a dependent type. Depending on the instance, some propositional-like calculus would end up being defined; this allows us to keep all the information required to define at least the most usual kinds of logical languages packed into the same `signature` type. It is also of course possible to define multiple dependent formula types for the same `signature` instance, so we could define (e.g.) lambda-terms for untyped lambda calculus with primitive lambda terms given by the functional symbols. Modalities are currently not used in our implementation of logical languages, but they are added to the signature to support future extensions in this direction. 
+
+&emsp; &emsp; We can see here that all of the fields are optional and come with sensible defaults. Variables are by the default natural numbers, but any type can be chosen provided that equality between instances of that type is decidable, as this is required in many of our proofs. If no field is provided, our later definition of a first-order formula will correspond to a simple calculus in which atomic propositions consist of equality comparisons between variables. Instead if we set the type of variables to the empty type `pempty` and the relational symbols to `ulift ℕ` (i.e. the type of natural numbers lifted to universe `u`) we get essentially classical propositional logic. Since our soundness proof is agnostic about the signature, it amounts to a proof of the soundness of all of these different logics.
 
 <!-- We used this approach rather than defining a first-order signature as a Lean structure essentially for programming convenience. We could still refactor our code to follow this approach:
 
@@ -153,25 +171,42 @@ This makes sense if these types are to represent symbols, for we would expect to
 &emsp; &emsp; The basic definitions of terms and formulas are given below:
 
 ```haskell
--- terms in the language
-inductive term
-| var : ℕ → term
-| app  {n : ℕ} (f : nary n) (v : fin n → term) :  term
+variable {σ : signature}
+-- arity types
 
--- constant terms.
-def nary.term : const → term
+-- the type of functional symbols of arity n
+def signature.nary (σ : signature) (n : ℕ) := subtype {f : σ.functional_symbol | σ.arity f = n}
+
+-- the type of relational symbols of arity n
+def signature.nrary (σ : signature) (n : ℕ) := subtype {r : σ.relational_symbol | σ.rarity r = n}
+
+-- the predicate defining, and the type of, constants
+def is_constant (f : σ.functional_symbol) := σ.arity f = 0
+def signature.const (σ : signature) := σ.nary 0
+
+-- terms in the language
+inductive signature.term (σ : signature)
+| var : σ.vars → signature.term
+| app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
+
+-- constant terms. A function that lifts a constant to a term.
+def signature.cterm (σ : signature) : σ.const → σ.term
 | c := term.app c fin_zero_elim
 
--- formulas
-inductive formula
-| relational {n : ℕ} (r : nrary n) (v : fin n → term) : formula
-| false : formula
-| for_all :  ℕ → formula → formula
-| if_then : formula → formula → formula
-| equation (t₁ t₂ : term) : formula
+--  the type of formulas in the language
+inductive  signature.formula (σ : signature)
+| relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
+| for_all :  σ.vars →  signature.formula →  signature.formula
+| if_then :  signature.formula →  signature.formula →  signature.formula
+| equation (t₁ t₂ : σ.term) :  signature.formula
+| false :  signature.formula
 ```
 
-&emsp; &emsp; As can be seen, we use the {$\forall, \to,\bot$} functionally complete fragment of first-order logic in the definition of formulas. For the `if_then` constructor we set up a specific notation, since Lean will allow us to do that:
+&emsp; &emsp; As can be seen, we use the {$\forall, \to,\bot$} functionally complete fragment of first-order logic in the definition of formulas. The other connectives were later defined in the usual way, the definition of which we omit for brevity. We further set up the symbol ` ⇒ ` as specific notation for the `if_then` constructor, as Lean allows us to specify our own notational conventions into the system. Our choice of variable binding is made due to simplicity and intuitiveness of implementation and readability of the source code. The quantifier simply binds a variable to a formula, and even though by default variables are natural numbers, they are not used as De Brujin indices.
+
+&emsp; &emsp; A nice convenience that we get out of our approach can already be seen. Lean allows functions defined as `type_name.name` to be later accessed with the *dot* notation with an instance of that type. So if `σ` is a signature `σ.term` will be its dependent type of terms and `σ.formula` the type of formulas in that signature. Moving on, the proof system was implemented inductively using natural deduction rules according to the following definition:
+
+<!-- For the `if_then` constructor we set up a specific notation, since Lean will allow us to do that:
 
 ```haskell
 reserve infixr ` ⇒ `:55
@@ -188,59 +223,58 @@ def formula.not (φ : formula)   := φ ⇒ formula.false
 def formula.or  (φ ψ : formula) := φ.not ⇒ ψ
 def formula.and (φ ψ : formula) := (φ.not.or ψ.not).not
 def formula.iff (φ ψ : formula) := (φ ⇒ ψ).and (ψ ⇒ φ)
-```
-<!-- <div style="page-break-before: always;"> -->
-&emsp; &emsp; The proof system was implemented inductively using natural deduction rules according to the following definition:
-<!-- </div> -->
+``` -->
 
 ```haskell
--- deductive consequence of formulas: Γ ⊢ φ
-inductive entails : set formula → formula → Prop
-| reflexivity (Γ : set formula) (φ : formula)(h : φ ∈ Γ) : entails Γ φ
-| transitivity (Γ Δ : set formula) (φ : formula)
-               (h₁ : ∀ ψ ∈ Δ, entails Γ ψ)
-               (h₂ : entails Δ φ) :  entails Γ φ
+-- deductive consequence of formulas: Γ ⊢ φ.
+-- Type of proofs from Γ to φ.
+inductive proof : set  σ.formula →  σ.formula → Type u_1
+| reflexivity (Γ : set  σ.formula) (φ :  σ.formula)(h : φ ∈ Γ) : proof Γ φ
+| transitivity (Γ Δ : set  σ.formula) (φ :  σ.formula)
+               (h₁ : ∀ ψ ∈ Δ, proof Γ ψ)
+               (h₂ : proof Δ φ) :  proof Γ φ
 | modus_ponens
-            (φ ψ : formula) (Γ : set formula)
-            (h₁ : entails Γ (φ ⇒ ψ))
-            (h₂ : entails Γ φ)
-             : entails Γ ψ
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
+            (h₁ : proof Γ (φ ⇒ ψ))
+            (h₂ : proof Γ φ)
+             : proof Γ ψ
 | intro
-            (φ ψ : formula) (Γ : set formula)
-            (h : entails (Γ ∪ {φ}) ψ)
-             : entails Γ (φ ⇒ ψ)
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
+            (h : proof (Γ ∪ {φ}) ψ)
+             : proof Γ (φ ⇒ ψ)
 | for_all_intro
-            (Γ : set formula) (φ : formula)
-            (x : ℕ) (xf : x ∈ φ.free)
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars) (xf : x ∈ φ.free)
             (abs : abstract_in x Γ)
-            (h : entails Γ φ)
-             : entails Γ (formula.for_all x φ)
+            (h : proof Γ φ)
+             : proof Γ ( signature.formula.for_all x φ)
 | for_all_elim
-            (Γ : set formula) (φ : formula)
-            (x : ℕ) (t : term)
-            (sub : φ.substitutable x t)
-            (h : entails Γ (formula.for_all x φ))
-             : entails Γ (φ.rw x t)
-| exfalso (Γ : set formula) (φ : formula)
-          (h : entails Γ formula.false)
-          : entails Γ φ
-| by_contradiction (Γ : set formula) (φ : formula)
-                   (h : entails Γ φ.not.not)
-                   : entails Γ φ
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars)
+            (t : σ.term) (sub : φ.substitutable x t)
+            (h : proof Γ ( signature.formula.for_all x φ))
+             : proof Γ (φ.rw x t)
+| exfalso (Γ : set  σ.formula) (φ :  σ.formula)
+          (h : proof Γ  signature.formula.false)
+          : proof Γ φ
+| by_contradiction (Γ : set  σ.formula) (φ :  σ.formula)
+                   (h : proof Γ φ.not.not)
+                   : proof Γ φ
 | identity_intro
-            (Γ : set formula) (t : term)
-             : entails Γ (formula.equation t t)
+            (Γ : set  σ.formula) (t : σ.term)
+             : proof Γ ( signature.formula.equation t t)
 | identity_elim 
-            (Γ : set formula) (φ : formula)
-            (x : ℕ) (xf : x ∈ φ.free)
-            (t₁ t₂: term)
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars) (xf : x ∈ φ.free)
+            (t₁ t₂: σ.term)
             (sub₁ : φ.substitutable x t₁)
             (sub₂ : φ.substitutable x t₂)
-            (h : entails Γ (φ.rw x t₁))
-            (eq : entails Γ (formula.equation t₁ t₂))
-             : entails Γ (φ.rw x t₂)
+            (h : proof Γ (φ.rw x t₁))
+            (eq : proof Γ ( signature.formula.equation t₁ t₂))
+             : proof Γ (φ.rw x t₂)
 
-local infixr `⊢`:55 := entails
+local infixr `⊢`:55 := proof
+
 ```
 
 &emsp; &emsp; Rewriting is used in the definition (`φ.rw`) as well as the notion of a variable being substitutable by a term in a formula. We also require defining the notion of a variable being free in a formula, and the notion of a variable being "abstract" in a set of formulas. We will detail the implementation of these in the following sections.
@@ -253,32 +287,41 @@ local infixr `⊢`:55 := entails
 For terms, rewriting/substituting a variable for another term is a simple procedure:
 
 ```haskell
-def term.rw : term → ℕ → term → term
+-- Rewrite a variable for a term in a term.
+-- This is also called a substitution of a variable for a term.
+def signature.term.rw : σ.term → σ.vars → σ.term → σ.term
 | (term.var a) x t := if x = a then t else term.var a
 | (term.app f v) x t := 
-    let v₂ := λ m, term.rw (v m) x t in
+    let v₂ := λ m, signature.term.rw (v m) x t in
     term.app f v₂
 ```
 
-&emsp; &emsp; Notice that lean allows us to call this function as `t₁.rw x t₂` where `t₁` and `t₂` are terms and `x` is a variable (which we chose to represent as a natural number). And this will work the same for the rewriting of terms in formulas. For formulas, the definition is simple as well, but we must be concerned with defining also the predicate which tells whether a term is substitutable for a variable in a formula:
+&emsp; &emsp; As already mentioned, Lean allows us to call this function as `t₁.rw x t₂` where `t₁` and `t₂` are terms and `x` is a variable; and this will work the same for the rewriting of terms in formulas. Now we must concern ourselves with defining the predicate which tells whether a term is substitutable for a variable in a formula:
 
 ```haskell
-def formula.rw : formula → ℕ → term → formula
-| (formula.relational r v) x t :=
+-- Rewrite (substitute) a variable for a term in a formula.
+def  signature.formula.rw :  σ.formula → σ.vars → σ.term →  σ.formula
+| ( signature.formula.relational r v) x t :=
     let v₂ := λ m, (v m).rw x t in
-    formula.relational r v₂
-| (formula.for_all y φ) x t :=
+     signature.formula.relational r v₂
+| ( signature.formula.for_all y φ) x t :=
     let ψ := if y = x then φ else φ.rw x t in
-    formula.for_all y ψ
-| (formula.if_then φ ψ) x t := (φ.rw x t) ⇒ (ψ.rw x t)
-| (formula.equation t₁ t₂) x t := formula.equation (t₁.rw x t) (t₂.rw x t)
+     signature.formula.for_all y ψ
+| ( signature.formula.if_then φ ψ) x t := (φ.rw x t) ⇒ (ψ.rw x t)
+| ( signature.formula.equation t₁ t₂) x t :=  signature.formula.equation (t₁.rw x t) (t₂.rw x t)
 | φ _ _ := φ
 
-def formula.substitutable  : formula → ℕ → term → Prop
-| (formula.for_all y φ) x t := x ∉ (formula.for_all y φ).free ∨
-                                (y ∉ t.vars ∧ φ.substitutable x t) 
-| (formula.if_then φ ψ) y t := φ.substitutable y t ∧ ψ.substitutable y t
-| _ _ _ := true -- atomic formulas
+-- definition of whether a variable is 
+-- substitutable for a term in a formula.
+-- Needed for proving some lemmas.
+def  signature.formula.substitutable  :  σ.formula → σ.vars → σ.term → Prop
+| ( signature.formula.for_all y φ) x t := 
+    x ∉ ( signature.formula.for_all y φ).free ∨
+    (y ∉ t.vars ∧ φ.substitutable x t) 
+| ( signature.formula.if_then φ ψ) y t := 
+    φ.substitutable y t ∧ ψ.substitutable y t
+| _ _ _ := true
+
 ```
 
 ### **Variables**
@@ -286,27 +329,27 @@ def formula.substitutable  : formula → ℕ → term → Prop
 We need to concern ourselves with defining free variables as well: 
 
 ```haskell
--- the variables present in a term
-def term.vars : term → set ℕ
+-- Get the set of variables of a term.
+def signature.term.vars  : σ.term → set σ.vars
 | (term.var a) := {a}
 | (term.app f v) :=
-    let v₂ := λ m, term.vars (v m) in
+    let v₂ := λ m, signature.term.vars (v m) in
     ⋃ m, v₂ m
 
 -- free variables
-def formula.free : formula → set ℕ
-| (formula.relational r v) := ⋃ m, (v m).vars
-| (formula.for_all x φ) := φ.free - {x}
-| (formula.if_then φ ψ) := φ.free ∪ ψ.free
-| (formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
-| formula.false := ∅
+def  signature.formula.free :  σ.formula → set σ.vars
+| ( signature.formula.relational r v) := ⋃ m, (v m).vars
+| ( signature.formula.for_all x φ) := φ.free - {x}
+| ( signature.formula.if_then φ ψ) := φ.free ∪ ψ.free
+| ( signature.formula.equation t₁ t₂) := t₁.vars ∪ t₂.vars
+|  signature.formula.false := ∅
 ```
 
 &emsp; &emsp; We must also define the notion of a variable being "abstract" in a set of formulas, which is to say that the variable doesn't appear free in any formula of the set:
 
 ```haskell
-def abstract_in : ℕ → set formula → Prop
-| x S := x ∉ (⋃ φ ∈ S, formula.free φ)
+def abstract_in : σ.vars → set  σ.formula → Prop
+| x S := x ∉ (⋃ φ ∈ S,  signature.formula.free φ)
 ```
 
 &emsp; &emsp; Given these definitions, all dependencies of our deductive system are defined. We can then provide some simple examples of proofs.
@@ -349,6 +392,23 @@ end
 
 ### **Semantic Definitions**
 
+For semantics, we start by defining a first-order structure for the signature `σ`, and the type of variable assignments:
+
+```haskell
+-- a structure for the language defined by σ, with domain in type α.
+structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
+    -- functional interpretation
+    (I₁ : Π {n}, σ.nary n → (fin n → α) → α)
+    -- relational interpretation
+    (I₂ : Π {n}, σ.nrary n → (fin n → α) → Prop)
+
+-- type of variable assignments
+def signature.vasgn (σ : signature) (α : Type u) := σ.vars → α
+
+variables {σ : signature} {α : Type u} [nonempty α]
+```
+
+<!-- 
 For semantics, given a type $\alpha$, which has at least one element, we define 3 types:
 - The type of functions mapping functional symbols of arity $n$ to functions of type $\alpha^n \to \alpha$.
 -  The type of functions mapping relational symbols of arity $n$ to n-ary relations of $\alpha$.
@@ -364,9 +424,8 @@ def rint {n : ℕ} := nrary n → (fin n → α) → Prop
 -- variable assignment
 def vasgn := ℕ → α
 ```
-<!-- <div style="page-break-before: always;"> -->
+
 &emsp; &emsp; It is then trivial to define a structure for the language. Now since the term `structure` is a reserved word in Lean, we use a synonym for that word in our definitions, and call it simply a model: 
-<!-- </div> -->
 
 ```haskell
 structure model :=
@@ -374,55 +433,69 @@ structure model :=
     (I₂ : Π {n}, @rint n)
 ```
 
-&emsp; &emsp; Even though a first-order structure in logic is only considered to be a model relative to a particular formula, or set of formulas, which it satisfies, we take the two words to be synonymous; since every structure is a model of some formula or another.
+&emsp; &emsp; Even though a first-order structure in logic is only considered to be a model relative to a particular formula, or set of formulas, which it satisfies, we take the two words to be synonymous; since every structure is a model of some formula or another. -->
 
 &emsp; &emsp; We then define references for terms in the language, and a way to bind a variable to a reference in a variable assignment:
 
 ```haskell
-def model.reference' (M : model) : term → vasgn → α
-| (term.var x) asg := asg x
-| (@term.app _ _  0 f _) _ := model.I₁ M f fin_zero_elim
-| (@term.app _ _  (n+1) f v) asg := let v₂ := λ k, model.reference' (v k) asg
-                                    in model.I₁ M f v₂
+-- the reference of a term in a structure relative to an assignment.
+def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
+| (signature.term.var x) asg := asg x
+| (@signature.term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
+| (@signature.term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
+                                    in M.I₁ f v₂
 
-def vasgn.bind (ass : vasgn) (x : ℕ) (val : α) : vasgn :=
+-- bind the value of a variable to `val` in an assignment 
+-- (generates a new assignment).
+def signature.vasgn.bind (ass : σ.vasgn α) (x : σ.vars) (val : α) : σ.vasgn α :=
     λy, if y = x then val else ass y
 ```
 
-&emsp; &emsp; The reference was defined differently for constant terms and for non-constant terms arising out of a function application, that is why there are two `@term.app` cases. The first maps the constant to the reference given by the interpretation, while the second first resolves the reference of every argument of the functional symbol to be applied, then interprets the functional symbol and applies the resulting function over the references of the arguments. Further, we define the relation of satisfiability of formulas in a model, both with respect to to a variable assignment and without one:
+&emsp; &emsp; The reference was defined differently for constant terms and for non-constant terms arising out of a function application, that is why there are two `@signature.term.app` cases. The first maps the constant to the reference given by the interpretation, while the second first resolves the reference of every argument of the functional symbol to be applied, then interprets the functional symbol and applies the resulting function over the references of the arguments. Notice that the definition of variable assignment wouldn't be possible if equality in the type of variables were not decidable, as that is required for using an **if** statement.
+
+&emsp; &emsp; Further, we define the relation of satisfiability of formulas in a structure, both with respect to a variable assignment and without one:
 
 ```haskell
-def model.satisfies' : model → formula → vasgn → Prop
-| M (formula.relational r v) asg := 
-    M.I₂ r $ λm,  M.reference' (v m) asg
-| M (formula.for_all x φ) ass :=
+-- tells whether a formula is true in a structure, relative to
+-- an assignment.
+def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasgn α → Prop
+| M ( signature.formula.relational r v) asg := 
+          M.I₂ r $ λm,  M.reference' (v m) asg
+| M ( signature.formula.for_all x φ) ass :=
     ∀ (a : α), M.satisfies' φ (ass.bind x a)
-| M (formula.if_then φ ψ) asg :=
+| M ( signature.formula.if_then φ ψ) asg :=
     let x := M.satisfies' φ asg,
         y := M.satisfies' ψ asg
     in x → y
-| M (formula.equation t₁ t₂) asg := 
+| M ( signature.formula.equation t₁ t₂) asg := 
     let x := M.reference' t₁ asg,
         y := M.reference' t₂ asg
     in x = y
-| M formula.false _ := false
+| M  signature.formula.false _ := false
 
-def model.satisfies : model → formula → Prop
-| M φ := ∀ (ass : vasgn), M.satisfies' φ ass
 
-local infixr `⊨₁`:55 := model.satisfies
+-- tells whether a formula is true in a structure, absolutely.
+def signature.structure.satisfies : σ.structure α → σ.formula → Prop
+| M φ := ∀ (ass : σ.vasgn α), M.satisfies' φ ass
+
+-- will reserve ⊨ without subscript for 
+-- semantic consequence of theories.
+local infixr `⊨₁`:55 := signature.structure.satisfies
 
 ```
 
-&emsp; &emsp; We have chosen to follow the convention that the functions defined with a `'` depend on a choice of assignment, while the ones without it do not. Finally, we define the notion of a formula being a semantic consequence of a set of formulas:
+&emsp; &emsp; We have chosen to follow the convention that the functions defined with a `'` depend on a choice of assignment, while the ones without it do not. Finally, we define the notion of a formula being a semantic consequence of a set of formulas. This got somewhat convoluted because Lean could not elaborate the `nonempty` instance of type `α` in the functions below:
 
 ```haskell
-def theory.follows (Γ : set formula) (φ : formula): Prop :=
-    ∀ (M : model) ass, 
-    (∀ ψ ∈ Γ, M.satisfies' ψ ass) →
-    M.satisfies' φ ass
+-- semantic consequence.
+-- Tells whether φ is true in every model/assignment in which Γ is true.
+def signature.follows (σ : signature) (Γ : set σ.formula) (φ : σ.formula) : Prop :=
+    ∀{α : Type u}[h : nonempty α]
+     (M : @signature.structure σ α h) (ass : σ.vasgn α),
+      (∀ ψ ∈ Γ, @signature.structure.satisfies' σ α h M ψ ass) →
+       @signature.structure.satisfies' σ α h M φ ass
 
-local infixr `⊨`:55 := theory.follows
+local infixr `⊨`:55 := signature.follows σ
 ```
 
 ### **The Proof**
@@ -438,48 +511,45 @@ theorem soundness : Γ ⊢ φ → Γ ⊨ φ := ...
 <!-- </div> -->
     
 ```haskell
-lemma bind_symm : ∀ {ass : vasgn} {x y : ℕ} {a b},
-                  x ≠ y →
-                 (ass.bind x a).bind y b = (ass.bind y b).bind x a 
-                 := ...
+lemma bind_symm : ∀ {ass : σ.vasgn α} {x y : σ.vars} {a b}, x ≠ y → (ass.bind x a).bind y b = (ass.bind y b).bind x a := ...
 
-lemma bind₁ : ∀ {ass : vasgn} {x : ℕ}, ass.bind x (ass x) = ass := ...
-lemma bind₂ : ∀ {ass : vasgn} {x : ℕ} {a b},
-              (ass.bind x a).bind x b = ass.bind x b := ...
+lemma bind₁ : ∀ {ass : σ.vasgn α} {x : σ.vars}, ass.bind x (ass x) = ass := ...
 
-lemma bind₃ : ∀ {M:model} {φ:formula}{ass : vasgn}{x : ℕ}{a},
+lemma bind₂ : ∀ {ass : σ.vasgn α} {x : σ.vars} {a b}, (ass.bind x a).bind x b = ass.bind x b := ...
+
+lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : σ.vasgn α}{x : σ.vars}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
               M.satisfies' φ ass)
               := ...
 
-lemma fundamental : ∀ y x (M : model) ass, abstract_in y Γ → 
+lemma fundamental : ∀ y x (M : σ.structure α) ass, abstract_in y Γ → 
             (∀ φ ∈ Γ, M.satisfies' φ ass) →
             ( ∀φ ∈ Γ, M.satisfies' φ (ass.bind y x))
             := ...
 
-lemma rw_semantics : ∀ {M:model} {ass:vasgn} {x t} {φ:formula},
+lemma rw_semantics : ∀ {M : σ.structure α} {ass:σ.vasgn α} {x t} {φ: σ.formula},
                      φ.substitutable x t →
-                     M.satisfies' (φ.rw x t) ass ↔
-                     M.satisfies' φ (ass.bind x (M.reference' t ass)) 
+                     (M.satisfies' (φ.rw x t) ass ↔
+                     M.satisfies' φ (ass.bind x (M.reference' t ass))) 
                      := ...
 ```
 
-&emsp; &emsp; We will not reproduce the proof here for lack of space. Furthermore, many references [7] already exist for an outline of how this sort of proof works. Suffices to say that the proof proceeds by induction on all possible ways that the set of formulas $\Gamma$ could prove the formula $\varphi$, by showing essentially that all logical rules preserve the validity of formulas. As a corollary we can conclude the consistency of the logical calculus by proving that the empty set of formulas does not derive `formula.false`:
+&emsp; &emsp; We will not reproduce the proof here for lack of space. Suffices to say that the proof proceeds by induction on all possible ways that the set of formulas $\Gamma$ could prove the formula $\varphi$, by showing essentially that all logical rules preserve the validity of formulas. As a corollary we can conclude the consistency of the logical calculus by proving that the empty set of formulas does not derive `formula.false`:
 
 ```haskell
-def consistent (Γ : set formula) := ¬ Γ ⊢ formula.false
-theorem consistency : consistent ∅ := ...
+def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
+theorem consistency : consistent (∅ : set σ.formula) := ...
 ```
 
-&emsp; &emsp; The proof works by constructing some structure $M$, which is then a model of the empty set. It follows by soundness that if `formula.false` could be proven from $\empty$, then $M$ would satisfy `formula.false`. Since no structure can do that, we have that $\empty$ does not prove `formula.false`.
+&emsp; &emsp; The proof works by constructing some structure $M$, which is then a model for the empty set. It follows by soundness that if `formula.false` could be proven from $\empty$, then $M$ would satisfy `formula.false`. Since no structure can do that, we have that $\empty$ does not prove `formula.false`.
 
 <!-- ### **The Logic of the Proof.**
 - Talk about how the soundness proof uses the lemmas. Give the statement of the lemmas and discuss in outline how they are used in the proof, but do not show proof the proof itself of either the lemmas nor of soundness. -->
 
 ## **Conclusion**
 
-We have summarized our implementation of the soundness proof, many more details could still be given about how the proofs were constructed, and the difficulties which lied therein. Our work still gives many opportunities for expansion, as one obvious yet much more laborious development would be the formalization of the completeness proof of classical predicate logic. For more practical utility, we could extend the syntax of the system to include Hoare triples and exemplify the application of Hoare logic to the formal verification of a particular algorithm in Lean. There is still much in store for the future.
+We have summarized our implementation of the soundness proof, many more details could still be given about how the proofs were constructed, and the difficulties which lied therein. Our work still gives many opportunities for expansion, as one obvious yet much more laborious development would be the formalization of the completeness proof of classical predicate logic. For more practical utility, we could extend the syntax of the system to include Hoare triples and exemplify the application of Hoare logic to the formal verification of a particular algorithm in Lean. For greater theoretical gain, we can use Lean for studying quantified modal logics and their algebraizations. There is still much in store for the future.
 
 <!-- - Talk about how this work immediately opens up the possibility of proving the consistency of arithmetic by using the natural numbers as a model, and also of proving completeness.
 - Talk about a future internalized (deep embedding) implementation of Hoare logic and how it could be used for program verification. -->
@@ -490,21 +560,26 @@ We have summarized our implementation of the soundness proof, many more details 
 &emsp; &emsp; Proceedings of the 1979 international congress at Hannover, Germany, L.J. Cohen, J. Los, H. Pfeiffer and  
 &emsp; &emsp; K.-P. Podewski (eds). Amsterdam: North- Holland Publishing Company, pp. 153–175.
 
-[2] 1958, "Combinatory Logic", Curry, Haskell B. and Robert Feys, Amsterdam: North-Holland.
+<!-- [2] 1958, "Combinatory Logic", Curry, Haskell B. and Robert Feys, Amsterdam: North-Holland. -->
 
-[2] 2020, "The lean mathematical library", in Proceedings of the 9th ACM SIGPLAN International Conference on  
-    &emsp; &emsp; Certified Programs and Proofs, The mathlib Community, ACM.
+<!-- [3] 2020, "The lean mathematical library", in Proceedings of the 9th ACM SIGPLAN International Conference on  
+    &emsp; &emsp; Certified Programs and Proofs, The mathlib Community, ACM. -->
 
-[4] 2017, Logic and Proof, Jeremy Avigad, Robert Y. Lewis, and Floris van Doorn,  
+[2] 2017, Logic and Proof, Jeremy Avigad, Robert Y. Lewis, and Floris van Doorn,  
     &emsp; &emsp; https://leanprover.github.io/logic_and_proof/ (accessed in 4/29/2020).
 
-[5] 2019, "A formalization of forcing and the unprovability of the continuum hypothesis", Jesse Michael Han and   
+[3] 2020, "Natural Number Game", http://wwwf.imperial.ac.uk/~buzzard/xena/natural_number_game/  
+    &emsp; &emsp; (accessed in 4/29/2020), Kevin Buzzard, Mohammad Pedramfar.
+
+[4] 2019, "A formalization of forcing and the unprovability of the continuum hypothesis", Jesse Michael Han and   
     &emsp; &emsp; Floris van Doorn.
 
-[6] 1969, "An Axiomatic Basis for Computer Programming", The Queen's University of Belfast, Departament of  
-    &emsp; &emsp; Computer Science Northen Ireland, C.A.R. Hoare.
+<!-- [6] 1969, "An Axiomatic Basis for Computer Programming", The Queen's University of Belfast, Departament of  
+    &emsp; &emsp; Computer Science Northen Ireland, C.A.R. Hoare. -->
 
-[7] 1972, "A Mathematical Introduction to Logic", Herbert B. Enderton.
+<!-- [7] 1972, "A Mathematical Introduction to Logic", Herbert B. Enderton. -->
 
-[8] 2020, "Natural Number Game", http://wwwf.imperial.ac.uk/~buzzard/xena/natural_number_game/  
-    &emsp; &emsp; (accessed in 4/29/2020), Kevin Buzzard, Mohammad Pedramfar.
+
+[5] https://github.com/maxd13/logic-soundness.git revision: dee91f2c29e56e49b45d70f4968eaedb1b8b9728
+
+[6] From, Asta Halkjær et al. “Teaching a Formalized Logical Calculus.” Electronic Proceedings in Theoretical Computer Science 313 (2020): 73–92. Crossref. Web.
