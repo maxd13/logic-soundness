@@ -12,10 +12,10 @@ structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
     -- relational interpretation
     (I₂ : Π {n}, σ.nrary n → (fin n → α) → Prop)
 
-variables {σ : signature} {α : Type u} [nonempty α]
-
 -- type of variable assignments
 def signature.vasgn (σ : signature) (α : Type u) := σ.vars → α
+
+variables {σ : signature} {α : Type u} [nonempty α]
 
 -- the reference of a term in a structure relative to an assignment.
 def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
@@ -27,7 +27,7 @@ def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn 
 -- The reference of a denotative term is independent from an assignment.
 -- Note: We adopt the convention that functions ending with ' 
 -- depend on assgnments, and others do not.
-def signature.structure.reference (M : σ.structure α) : σ.pterm → α :=
+def signature.structure.reference (M : σ.structure α) : σ.hterm → α :=
     begin
         -- Although idk if it is a good idea to define functions using tactics.
         -- What happens if I unfold their definitions later?
@@ -113,8 +113,8 @@ variables (Γ : set σ.formula) (φ : σ.formula)
 
 -- semantic consequence.
 -- Tells whether φ is true in every model/assignment in which Γ is true.
--- Ended up being a complex definition because of the synthesizer,
--- maybe we can simplify it later?s
+-- Ended up being a complex definition because of the synthesizer/elaborator,
+-- maybe we can simplify it later?
 def signature.follows (σ : signature) (Γ : set σ.formula) (φ : σ.formula) : Prop :=
     ∀{α : Type u}[h : nonempty α] (M : @signature.structure σ α h) (ass : σ.vasgn α),
       (∀ ψ ∈ Γ, @signature.structure.satisfies' σ α h M ψ ass) → @signature.structure.satisfies' σ α h M φ ass
@@ -174,10 +174,10 @@ begin
     exact t_ih y h,
 end
 
--- Somethings to note here:
--- * It seems it would be impossible to prove this without generalizing the assignment in the induction.
--- * It seems it would be impossible to prove just one side of the ↔ alone.
--- * I've learned this the hard way.
+-- Some things to note here:
+-- . It seems it would be impossible to prove this without generalizing the assignment in the induction.
+-- . It seems it would be impossible to prove just one side of the ↔ alone.
+-- . I've learned this the hard way.
 lemma bind₃ : ∀ {M : σ.structure α} {φ: σ.formula}{ass : σ.vasgn α}{x : σ.vars}{a},
               x ∉ φ.free →
               (M.satisfies' φ (ass.bind x a) ↔
@@ -459,19 +459,22 @@ begin
     rw ←ih₂,
 end
 
--- This we will finish later... eventually.
-
--- theorem consistency : consistent ∅ :=
--- begin
---     intro h,
---     replace h := soundness ∅  signature.formula.false h,
---     have M : signature.structure := sorry,
---     have ass : σ.vasgn α := sorry,
---     specialize h M ass,
---     revert h,
---     dunfold signature.structure.satisfies',
---     simp,
--- end
+theorem consistency : consistent (∅ : set σ.formula) := 
+begin
+    intro h,
+    obtain ⟨x⟩ := h,
+    replace h := @soundness σ ∅ signature.formula.false x,
+    revert h,
+    dunfold signature.follows,
+    simp,
+    intro h,
+    have M : σ.structure unit := sorry,
+    specialize @h unit unit.star M,
+    apply @false_is_unsat σ unit,
+    dunfold signature.structure.satisfies,
+    existsi M,
+    exact h,
+end
 
 -- end semantics
 end logic
