@@ -92,8 +92,8 @@ def signature.term.denotes (t : σ.term) : Prop := t.vars = (∅ : set σ.vars)
 @[reducible]
 def signature.term.conotes (t : σ.term) := ¬ t.denotes
 
--- a closed term is a term in the Proper sense of the term (pun intended).
-def signature.pterm (σ : signature) := subtype {t : σ.term | t.denotes}
+-- a closed term is a Herbrand term.
+def signature.hterm (σ : signature) := subtype {t : σ.term | t.denotes}
 
 -- an open term is an expression.
 def signature.expression (σ : signature) := subtype {t : σ.term | t.conotes}
