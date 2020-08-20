@@ -459,6 +459,11 @@ begin
     rw ←ih₂,
 end
 
+instance inhabited_structure : inhabited (σ.structure unit) := 
+⟨{ I₁ := λ _ _ _, unit.star,
+  I₂ := λ _ _ _, true }⟩
+
+
 theorem consistency : consistent (∅ : set σ.formula) := 
 begin
     intro h,
@@ -468,7 +473,7 @@ begin
     dunfold signature.follows,
     simp,
     intro h,
-    have M : σ.structure unit := sorry,
+    have M : σ.structure unit := default _,
     specialize @h unit unit.star M,
     apply @false_is_unsat σ unit,
     dunfold signature.structure.satisfies,
