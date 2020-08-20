@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Proving the consistency of Logic in Lean</title>
+  <meta charset="utf-8" />
+  <style>
+    @import url(https://fonts.googleapis.com/css?family=Yanone + Kaffeesatz);
+    @import url(https://fonts.googleapis.com/css?family=Droid + Serif:400,
+ 700,
+    400italic);
+    @import url(https://fonts.googleapis.com/css?family=Ubuntu + Mono:400,
+ 700,
+    400italic);
+
+    body {
+      font-family: "Droid Serif";
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: "Yanone Kaffeesatz";
+      font-weight: normal;
+    }
+
+    .remark-code,
+    .remark-inline-code {
+      font-family: "Ubuntu Mono";
+      font-size: 16pt;
+    }
+
+    pre {
+      /* page-break-inside: avoid; */
+      white-space: pre-wrap;
+    }
+
+    .author {
+      text-align: center;
+      font-weight: bold;
+      padding-top: 12pt;
+
+    }
+
+    .address {
+      text-align: center;
+      padding-top: 12pt;
+    }
+
+    .email {
+      text-align: center;
+      font-size: 10pt;
+      font-family: 'Courier New', Courier monospace;
+      padding-top: 6pt;
+      padding-bottom: 6pt;
+    }
+
+    .large {
+      font-size: 16pt;
+    }
+  </style>
+</head>
+
+<body>
+  <textarea id="source">
+
+class: center, middle
+
+# Proving the consistency of Logic in Lean
+
+.author[Luiz Carlos Rumbelsperger Viana]
+<!-- .address[Departamento de Informática -- Pontifícia Universidade Católica do Rio de Janeiro (PUC-RJ) 
+-- Rio de Janeiro, RJ,  Brazil] -->
+
+.email[luizcarlosrvn424@gmail.com]
+
+<a>https://github.com/maxd13/logic-soundness</a>
+
+Rio de Janeiro, 26 of August, 2020.
+
+???
+
+[Give pause so that people can read the title of the slide]
+
+OK, so to begin this presentation. 
+Hi, my name is Luiz Carlos Rumbelsperger Viana, 
+I am an undergraduate student of computer science 
+in Pontifícia Universidade Católica do Rio de Janeiro, PUC Rio.
+
+This presentation is the result of my undergraduate 
+scientific initiation research into interactive theorem provers
+with professor Hermann at PUC Rio. It is the first paper I publish, 
+and my first presentation at a congress.
+
+I am going to explain today my implementation of the 
+soundness proof of first-order predicate logic 
+in the Lean interactive theorem prover.
+
+---
+
+# Motivation of our work
+
+* .large[Personal learning].
+* .large[Using Lean for teaching logic to others in the future].
+* .large[Future investigations into the formalization of meta-theorems of logical systems].
+
+
+???
+
+In this project we were motivated primarily by the opportunity for personal learning
+of the Lean theorem prover itself as a formalization tool, and of the details involved in the
+soundness and consistency proofs of first order predicate logic. 
+We were also interested in the possibility of using Lean as a tool for teaching 
+logic to students in the future, since code is often able to clarify most ambiguities in the 
+presentation of a complex topic such as the soundness and completeness proofs of a logical 
+calculus.
+
+So, in the future we plan to formalize the completeness proof of the calculus for our personal understanding. 
+One interesting research problem in this direction would be to investigate by formal
+means the pros and cons of an algebraic proof of completeness (via Cyllindric algebras) 
+versus the more classical Godelian proof. 
+
+---
+
+# Lean Prover
+
+* Developed since 2013 by Leonardo de Moura at Microsoft Research.
+* Open source, great documentation, vscode extension, emacs mode.
+* Emphasizes automation (like Isabelle/HOL), through a metaprogramming framework.
+* Higly expressive like Coq (CiC).
+* Can naturally express much of mathematics (e.g. Perfectoid spaces).
+
+**Many projects seeking to formalize most parts of undergraduate level mathematics in Lean 
+(Mathlib, Xena project, Lean Forward, etc...).**
+
+
+???
+
+
+About the Lean prover itself, it is a prover that builds upon 
+the calculus of inductive constructions and aims at integrating proof 
+assistants with proof automation. You can write your own proof procedures 
+in the same language as the theorem prover itself, via a tactics metaprogramming framework.  
+
+[Describe bullet points]
+
+So, personally I started learning Lean as my first proof assistant. 
+That makes it hard for me to compare it with other proof assistants,
+since I don't have the same experience with Isabelle and CoQ. 
+I preferred diving a little bit deeper in Lean than trying to learn to use 
+several provers at once.
+
+---
+
+# Implementation Difficulties
+
+* Too many different ways to do essentially the same thing (high language abstraction).
+* Trying out a "wrong" idea can be costly.
+* Intricate syntactical details involving variable substitution.
+
+???
+
+Moving on to the implementation, 
+TODO
+
+
+
+Intricate syntactical details involving variable substitution generates many additional lemmas
+about the semantics substitutions that would probably be glossed over in a standard 
+presentation of the soundness proof.
+
+---
+
+# Implementation
+
+* Syntax
+  - **Signature/Language**
+  - **Terms**
+  - **Formulas**
+  - Rewrite/Substitution system
+  - Variables
+  - **Proof system**
+  - Proof Examples
+  - **Consistency definition**
+* Semantics
+  - **Structures and variable assignment**
+  - **Term references**
+  - **Satisfiability of formulas**
+  - Lemmas
+  - **The Soundness proof**
+  - **The Consistency proof**
+
+Roughly 1000 lines of Lean code.
+
+???
+
+We divided our implementation into 2 modules, the first
+handles the syntax of the language and the deductive system, 
+the second gives semantics to the language and contains the soundness 
+and consistency proofs. The project has roughly 1000 lines of Lean code.
+
+We are going to explain today the sections of our work marked in bold. 
+The other sections will have to be skipped since it would 
+be impossible to explain them within 10 minutes.
+
+---
+
+# Signatures
+
+```haskell
+-- The type of signatures, which defines a first-order language,
+-- possibly with extra modalities, and with room for defining your
+-- own preferred variable type.
+@[derive inhabited]
+structure signature : Type (u+1) :=
+    (functional_symbol : Type u := pempty)
+    (relational_symbol : Type u := pempty)
+    (modality : Type u := pempty)
+    (vars : Type u := ulift ℕ) 
+    (dec_vars : decidable_eq vars . apply_instance)
+    (arity : functional_symbol → ℕ := λ_, 0)
+    (rarity : relational_symbol → ℕ := λ_, 0)
+    (marity : modality → ℕ := λ_, 0)
+```
+
+
+???
+
+Perhaps the most interesting aspect of our implementation is the usage
+of dependent types to define a signature abstraction which can be used polymorphically
+to define multiple formal languages.
+
+As can be seen, the signature contains a type of functional symbols, a type of relational symbols,
+a type of modal operator symbols, a type of variables, a decision procedure for equality between variables,
+and 3 maps which associate arities to each different kind of symbol.
+
+We can see here that all of the fields are optional and come with sensible defaults.
+Variables are by the default natural numbers, but any type can be chosen provided
+that equality between instances of that type is decidable,
+as this is required in many proofs.
+
+[small pause]
+
+Ok, so then the type of first-order formulas will be defined in terms an instance of this type, as a dependent type.
+It will be depending on an instance of this type for its definition.
+
+Depending on which signature we use,
+a different calculus would end up being defined
+; this allows us to keep all the information required to define
+the most usual kinds of logical languages packed into the same type.
+
+And since our soundness proof is agnostic about the signature we are using,
+it amounts to a proof of the soundness of many different logics.
+
+Modalities were added there to foreshadow a future development direction I have in mind, but they were ignored
+in the rest of our implementations.
+
+
+---
+
+# Terms
+
+```haskell
+variable {σ : signature}
+-- arity types
+
+-- the type of functional symbols of arity n
+def signature.nary (σ : signature) (n : ℕ) := subtype {f : σ.functional_symbol | σ.arity f = n}
+
+-- the type of relational symbols of arity n
+def signature.nrary (σ : signature) (n : ℕ) := subtype {r : σ.relational_symbol | σ.rarity r = n}
+
+-- the predicate defining, and the type of, constants
+def is_constant (f : σ.functional_symbol) := σ.arity f = 0
+def signature.const (σ : signature) := σ.nary 0
+
+-- terms in the language
+inductive signature.term (σ : signature)
+| var : σ.vars → signature.term
+| app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
+
+```
+
+**Lean has poor support for nested inductive types.** 
+
+???
+
+TODO
+
+Lean has poor support for what are called "nested inductive types",
+which for me meant spending a lot of time trying to figure out the best way to define terms.
+The definition we settled on uses the `fin n` type which is the type of natural numbers lesser than n.
+The most obvious and convenient choice would be to use the dependent type of vectors, which are 
+fixed dimension lists of a given type. However lean does not allow us to use 
+parametric types which depend on the type being defined, 
+which means we were forced to rely on the type.
+
+
+---
+
+# Constant Terms and Formulas
+
+```haskell
+-- constant terms. A function that lifts a constant to a term.
+def signature.cterm (σ : signature) : σ.const → σ.term
+| c := term.app c fin_zero_elim
+
+--  the type of formulas in the language
+inductive  signature.formula (σ : signature)
+| relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
+| for_all :  σ.vars →  signature.formula →  signature.formula
+| if_then :  signature.formula →  signature.formula →  signature.formula
+| equation (t₁ t₂ : σ.term) :  signature.formula
+| false :  signature.formula
+```
+
+???
+
+[short pause]
+
+We created a simple utility to lift constant symbols to terms.
+Formulas are defined inductively in the usual way from the terms.
+
+[short pause]
+
+TODO
+
+---
+
+# Proof system
+
+```haskell
+-- deductive consequence of formulas: Γ ⊢ φ.
+-- Type of proofs from Γ to φ.
+inductive proof : set  σ.formula →  σ.formula → Type u_1
+| reflexivity (Γ : set  σ.formula) (φ :  σ.formula)(h : φ ∈ Γ) : proof Γ φ
+| transitivity (Γ Δ : set  σ.formula) (φ :  σ.formula)
+               (h₁ : ∀ ψ ∈ Δ, proof Γ ψ)
+               (h₂ : proof Δ φ) :  proof Γ φ
+| modus_ponens
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
+            (h₁ : proof Γ (φ ⇒ ψ))
+            (h₂ : proof Γ φ)
+             : proof Γ ψ
+| intro
+            (φ ψ :  σ.formula) (Γ : set  σ.formula)
+            (h : proof (Γ ∪ {φ}) ψ)
+             : proof Γ (φ ⇒ ψ)
+```
+???
+This is a very long definition of the deductive system of first order logic.
+TODO
+---
+# Proof system
+```haskell
+| for_all_intro
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars) (xf : x ∈ φ.free)
+            (abs : abstract_in x Γ)
+            (h : proof Γ φ)
+             : proof Γ ( signature.formula.for_all x φ)
+| for_all_elim
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars)
+            (t : σ.term) (sub : φ.substitutable x t)
+            (h : proof Γ ( signature.formula.for_all x φ))
+             : proof Γ (φ.rw x t)
+| exfalso (Γ : set  σ.formula) (φ :  σ.formula)
+          (h : proof Γ  signature.formula.false)
+          : proof Γ φ
+| by_contradiction (Γ : set  σ.formula) (φ :  σ.formula)
+                   (h : proof Γ φ.not.not)
+                   : proof Γ φ
+```
+???
+TODO
+---
+# Proof system
+```haskell
+| identity_intro
+            (Γ : set  σ.formula) (t : σ.term)
+             : proof Γ ( signature.formula.equation t t)
+| identity_elim 
+            (Γ : set  σ.formula) (φ :  σ.formula)
+            (x : σ.vars) (xf : x ∈ φ.free)
+            (t₁ t₂: σ.term)
+            (sub₁ : φ.substitutable x t₁)
+            (sub₂ : φ.substitutable x t₂)
+            (h : proof Γ (φ.rw x t₁))
+            (eq : proof Γ ( signature.formula.equation t₁ t₂))
+             : proof Γ (φ.rw x t₂)
+
+local infixr `⊢`:55 := proof
+
+```
+
+???
+
+TODO
+---
+
+# Structures
+
+
+```haskell
+-- a structure for the language defined by σ, with domain in type α.
+structure signature.structure (σ : signature) (α : Type u) [nonempty α] :=
+    -- functional interpretation
+    (I₁ : Π {n}, σ.nary n → (fin n → α) → α)
+    -- relational interpretation
+    (I₂ : Π {n}, σ.nrary n → (fin n → α) → Prop)
+
+-- type of variable assignments
+def signature.vasgn (σ : signature) (α : Type u) := σ.vars → α
+
+variables {σ : signature} {α : Type u} [nonempty α]
+```
+
+???
+
+TODO
+
+---
+
+# Term references
+
+```haskell
+-- the reference of a term in a structure relative to an assignment.
+def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
+| (signature.term.var x) asg := asg x
+| (@signature.term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
+| (@signature.term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
+                                    in M.I₁ f v₂
+
+-- bind the value of a variable to `val` in an assignment 
+-- (generates a new assignment).
+def signature.vasgn.bind (ass : σ.vasgn α) (x : σ.vars) (val : α) : σ.vasgn α :=
+    λy, if y = x then val else ass y
+```
+
+???
+
+TODO
+
+---
+
+# Satisfiability
+
+```haskell
+-- tells whether a formula is true in a structure, relative to
+-- an assignment.
+def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasgn α → Prop
+| M ( signature.formula.relational r v) asg := 
+          M.I₂ r $ λm,  M.reference' (v m) asg
+| M ( signature.formula.for_all x φ) ass :=
+    ∀ (a : α), M.satisfies' φ (ass.bind x a)
+| M ( signature.formula.if_then φ ψ) asg :=
+    let x := M.satisfies' φ asg,
+        y := M.satisfies' ψ asg
+    in x → y
+| M ( signature.formula.equation t₁ t₂) asg := 
+    let x := M.reference' t₁ asg,
+        y := M.reference' t₂ asg
+    in x = y
+| M  signature.formula.false _ := false
+```
+???
+
+TODO
+
+---
+
+# Satisfiability
+
+```haskell
+-- tells whether a formula is true in a structure, absolutely.
+def signature.structure.satisfies : σ.structure α → σ.formula → Prop
+| M φ := ∀ (ass : σ.vasgn α), M.satisfies' φ ass
+
+-- will reserve ⊨ without subscript for 
+-- semantic consequence of theories.
+local infixr `⊨₁`:55 := signature.structure.satisfies
+
+```
+
+???
+
+TODO
+
+---
+
+# Soundness Proof
+
+```haskell
+-- So pretty.
+theorem soundness : Γ ⊢ φ → Γ ⊨ φ :=
+begin
+    intros proof α ne M ass h,
+    induction proof generalizing ass,
+    -- case reflexivity
+    exact h proof_φ proof_h,
+    -- case transitivity
+    apply proof_ih_h₂,
+    intros ψ H,
+    exact proof_ih_h₁ ψ H ass h,
+    -- case modus ponens
+    have c₁ := proof_ih_h₁ ass h,
+    have c₂ := proof_ih_h₂ ass h,
+    revert c₁,
+    dunfold signature.structure.satisfies',
+    simp,
+    intro c₁,
+    exact c₁ c₂,
+```
+    
+???
+
+TODO
+
+---
+
+# Soundness Proof
+
+```haskell
+  -- case intro
+  intro h₂,
+  have sat := proof_ih,
+  apply sat,
+  intros ψ H,
+  cases H,
+  exact h ψ H,
+  simp at H,
+  rwa H,
+  -- case universal intro
+  intro x,
+  have c := @fundamental σ α ne proof_Γ proof_x x,
+  specialize c M ass proof_abs h,
+  have ih := proof_ih (@signature.vasgn.bind σ α ne ass proof_x x),
+  apply ih,
+  exact c,
+```
+  
+???
+
+TODO
+
+---
+
+# Soundness Proof
+
+```haskell
+  -- case universal elim
+  have ih := proof_ih ass h,
+  rename proof_sub sub,
+  clear proof_ih,
+  revert ih,
+  dunfold signature.structure.satisfies',
+  intro ih,
+  set ref := @signature.structure.reference' σ α ne M proof_t ass,
+  specialize ih ref,
+  exact (@rw_semantics σ α ne M ass proof_x proof_t proof_φ sub).2 ih,
+  -- case exfalso
+  exfalso,
+  have ih := proof_ih ass h,
+  revert ih,
+  dunfold signature.structure.satisfies',
+  contradiction,
+```
+  
+???
+
+TODO
+
+---
+
+# Soundness Proof
+
+```haskell
+  -- case by contradiction
+  classical,
+  by_contradiction,
+  have ih := proof_ih ass h,
+  revert ih,
+  dunfold  signature.formula.not signature.structure.satisfies',
+  simp,
+  intro ih,
+  apply ih,
+  intro insanity,
+  contradiction,
+  -- case identity intro
+  dunfold signature.structure.satisfies',
+  simp,
+```
+  
+???
+
+TODO
+
+---
+
+# Soundness Proof
+
+```haskell
+  -- case identity elimination
+  have ih₁ := proof_ih_h ass h,
+  have ih₂ := proof_ih_eq ass h,
+  rename proof_sub₁ sub₁,
+  rename proof_sub₂ sub₂,
+  replace ih₁ := (@rw_semantics σ α ne M ass proof_x proof_t₁ proof_φ sub₁).mp ih₁,
+  apply (rw_semantics sub₂).2,
+  convert ih₁ using 2,
+  revert ih₂,
+  dunfold signature.structure.satisfies',
+  simp,
+  intro ih₂,
+  rw ←ih₂,
+end
+
+instance inhabited_structure : inhabited (σ.structure unit) := 
+⟨{ I₁ := λ _ _ _, unit.star,
+  I₂ := λ _ _ _, true }⟩
+```
+
+???
+
+TODO
+
+---
+
+# Consistency Proof
+
+```haskell
+theorem consistency : consistent (∅ : set σ.formula) := 
+begin
+    intro h,
+    obtain ⟨x⟩ := h,
+    replace h := @soundness σ ∅ signature.formula.false x,
+    revert h,
+    dunfold signature.follows,
+    simp,
+    intro h,
+    have M : σ.structure unit := default _,
+    specialize @h unit unit.star M,
+    apply @false_is_unsat σ unit,
+    dunfold signature.structure.satisfies,
+    existsi M,
+    exact h,
+end
+```
+
+???
+
+TODO
+
+---
+
+
+class: center, middle
+# ***Fin***
+
+???
+
+[Finish with video showing my face, giving thanks for allowing me to participate of the conference]
+
+
+    </textarea>
+  <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+  <script>
+    var slideshow = remark.create({ ratio: '16:9' });
+  </script>
+</body>
+
+</html>
