@@ -26,7 +26,7 @@ def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn 
 
 -- The reference of a denotative term is independent from an assignment.
 -- Note: We adopt the convention that functions ending with ' 
--- depend on assgnments, and others do not.
+-- depend on assignments, and others do not.
 def signature.structure.reference (M : σ.structure α) : σ.hterm → α :=
     begin
         -- Although idk if it is a good idea to define functions using tactics.

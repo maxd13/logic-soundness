@@ -1,8 +1,7 @@
 import data.set.lattice tactic.find tactic.tidy tactic.ring
 universe u
 
--- We introduce a much simplified version of
--- untyped first order predicate logic.
+-- We implement first order predicate logic.
 
 namespace logic
 open list tactic set
@@ -232,7 +231,7 @@ def  signature.formula.free :  σ.formula → set σ.vars
 |  signature.formula.false := ∅
 
 -- definition of whether a variable is 
--- substititutable for a term in a formula.
+-- substitutable for a term in a formula.
 -- Needed for proving some lemmas.
 def  signature.formula.substitutable  :  σ.formula → σ.vars → σ.term → Prop
 | ( signature.formula.for_all y φ) x t := x ∉ ( signature.formula.for_all y φ).free ∨
@@ -248,7 +247,6 @@ def  signature.formula.open :  σ.formula → Prop
 | φ := ¬ φ.closed
 
 -- atomic and molecular formulas
-
 def signature.formula.atomic :  σ.formula → bool
 | (formula.relational r v) := tt
 | (formula.equation t₁ t₂) := tt
@@ -295,7 +293,6 @@ def  signature.formula.generalize :  σ.formula → list σ.vars →  σ.formula
 | φ (x::xs) :=  signature.formula.for_all x $ φ.generalize xs
 
 -- lemmas about rewriting in formulas:
-
 theorem formula_rw : ∀ {φ :  σ.formula} {x : σ.vars}, x ∉ φ.free → ∀(t : σ.term),φ.rw x t = φ :=
     begin
         intros φ x h t,
@@ -361,7 +358,6 @@ lemma trivial_formula_rw : ∀ {φ: σ.formula} {x}, φ.rw x (term.var x) = φ :
 -- deductive consequence of formulas: Γ ⊢ φ.
 -- Type of proofs from Γ to φ.
 -- The universe var here has been automatically generated,
--- I don't want to bother naming this properly right now.
 inductive proof : set  σ.formula →  σ.formula → Type u_1
 | reflexivity (Γ : set  σ.formula) (φ :  σ.formula)(h : φ ∈ Γ) : proof Γ φ
 | transitivity (Γ Δ : set  σ.formula) (φ :  σ.formula)
@@ -432,7 +428,7 @@ begin
 end 
 
 -- The following commented code chunks are unfinished attempts
--- to prove that proofs are finite:
+-- to prove that proofs are finite (they can be safely ignored):
 
 -- This one depends on syntatical equality between σ.formulas
 -- being decidable, which in turn depends on the equality of
@@ -464,7 +460,7 @@ end
 --     end
 
 
--- This here are earlier attempts squash proof trees either as lists
+-- This here are earlier attempts to squash proof trees either as lists
 -- or finsets.
 
 
