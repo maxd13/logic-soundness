@@ -152,25 +152,6 @@ several provers at once.
 
 ---
 
-# Implementation Difficulties
-
-* Too many different ways to do essentially the same thing (high language abstraction).
-* Trying out a "wrong" idea can be costly.
-* Intricate syntactical details involving variable substitution.
-
-???
-
-Moving on to the implementation, 
-TODO
-
-
-
-Intricate syntactical details involving variable substitution generates many additional lemmas
-about the semantics substitutions that would probably be glossed over in a standard 
-presentation of the soundness proof.
-
----
-
 # Implementation
 
 * Syntax
@@ -181,7 +162,6 @@ presentation of the soundness proof.
   - Variables
   - **Proof system**
   - Proof Examples
-  - **Consistency definition**
 * Semantics
   - **Structures and variable assignment**
   - **Term references**
@@ -239,8 +219,6 @@ Variables are by the default natural numbers, but any type can be chosen provide
 that equality between instances of that type is decidable,
 as this is required in many proofs.
 
-[small pause]
-
 Ok, so then the type of first-order formulas will be defined in terms an instance of this type, as a dependent type.
 It will be depending on an instance of this type for its definition.
 
@@ -278,33 +256,27 @@ def signature.const (σ : signature) := σ.nary 0
 inductive signature.term (σ : signature)
 | var : σ.vars → signature.term
 | app  {n : ℕ} (f : σ.nary n) (v : fin n → signature.term) :  signature.term
-
 ```
-
-**Lean has poor support for nested inductive types.** 
 
 ???
 
-TODO
 
-Lean has poor support for what are called "nested inductive types",
-which for me meant spending a lot of time trying to figure out the best way to define terms.
-The definition we settled on uses the `fin n` type which is the type of natural numbers lesser than n.
-The most obvious and convenient choice would be to use the dependent type of vectors, which are 
-fixed dimension lists of a given type. However lean does not allow us to use 
-parametric types which depend on the type being defined, 
-which means we were forced to rely on the type.
+Here we see that we define the type of terms of the signature.
+First we declare a signature sigma as a variable, 
+then we declare the type of functional symbols of a given arity,
+the type of relational symbols of a given arity, 
+the type of constant functional symbols, and finally the type of terms.
 
+We see that terms are defined inductively from the variables and functional 
+symbols of the signature. So this definition states that a term is either a variable
+or the junction of a functional symbol of arity n with other n previously defined terms.
+These n other terms are introduced here via the function `v`.
 
 ---
 
-# Constant Terms and Formulas
+# Formulas
 
 ```haskell
--- constant terms. A function that lifts a constant to a term.
-def signature.cterm (σ : signature) : σ.const → σ.term
-| c := term.app c fin_zero_elim
-
 --  the type of formulas in the language
 inductive  signature.formula (σ : signature)
 | relational {n : ℕ} (r : σ.nrary n) (v : fin n → σ.term) :  signature.formula
@@ -312,18 +284,29 @@ inductive  signature.formula (σ : signature)
 | if_then :  signature.formula →  signature.formula →  signature.formula
 | equation (t₁ t₂ : σ.term) :  signature.formula
 | false :  signature.formula
+
+-- a convenient notation to set up for if_then
+reserve infixr ` ⇒ `:55
+class has_exp (α : Type u) := (exp : α → α → α)
+infixr ⇒ := has_exp.exp
+
+instance  signature.formula.has_exp : has_exp  σ.formula := ⟨signature.formula.if_then⟩
 ```
 
 ???
 
-[short pause]
-
-We created a simple utility to lift constant symbols to terms.
 Formulas are defined inductively in the usual way from the terms.
+A formula is either generated from a relational symbol
+which is "applied" to terms, an equation between terms,
+the false formula, 
+or generated from these atomic formulas by means of universal
+quantification or the implication connective, if_then.
 
-[short pause]
-
-TODO
+For this last connective we also set up a convenient notation using Lean's 
+class resolution mechanism, which in this case sets up the arrow symbol 
+to be associated with the has_exp class, which is instantiated with the the if_then formula
+constructor. Now whenever we use this arrow as an infixed function of 2 formulas, Lean already
+knows how to elaborate the instance we defined and apply the if_then constructor. 
 
 ---
 
@@ -348,8 +331,21 @@ inductive proof : set  σ.formula →  σ.formula → Type u_1
              : proof Γ (φ ⇒ ψ)
 ```
 ???
-This is a very long definition of the deductive system of first order logic.
-TODO
+
+So, moving to the proof system, we define a system of natural deduction for the
+predicate calculus inductively using a dependent type of proofs. This is the type of all
+proofs of a formula **phi** from a set of formulas **Gamma**. Natural deduction rules are proof constructors.
+
+With the exception of the the reflexivity and transitivity rules, 
+and the rules for reasoning by contradiction, each proof constructor is either an elimination 
+or an introduction rule for one of the connectives, the universal quantifier, or equality.
+In portion of the code, the third rule is implication elimination, also known as modus ponens.
+The fourth rule is implication introduction, shortnamed intro after the name of a Lean tactic
+which works the same way.
+
+This will be a long definition of the deductive system of first order logic, which
+we will continue in the following slides.
+
 ---
 # Proof system
 ```haskell
@@ -373,7 +369,22 @@ TODO
                    : proof Γ φ
 ```
 ???
-TODO
+
+Here we have the rules for the universal quantifier, and also the rules for reasoning with contradiction 
+which ultimately make the proof system classical. 
+
+In the first constructor the *abs* field says that the variable **x** does not appear free in **Gamma**.
+The rule constructs a proof of the universal generalization by **x** of the formula **phi** from the set of formulas **Gamma**
+whenever the variable x is free in **phi**, does not appear free in **Gamma**, and **Gamma** can prove **phi**.
+
+The second constructor proves, with respect to **Gamma**, 
+that the one place predicate **phi** applies to term **t** whenever **x** is substitutable by **t** in **phi** and 
+**Gamma** proves the universal generalization of **phi** by **x**.
+
+The interpretation of the other rules is obvious from a reading of the source code.
+
+[small pause]
+
 ---
 # Proof system
 ```haskell
@@ -396,7 +407,15 @@ local infixr `⊢`:55 := proof
 
 ???
 
-TODO
+Here we clearly have the rules for equality, i.e. identity relation of the calculus.
+The first rules simply states that identity is reflexive, while the second allows substitution 
+*salva veritate* to occur for equal terms within formulas.
+
+To conclude the definition of our system, we set up the tilde symbol as an infixed operator
+to refer to the type of proofs, as is standard notation for proof systems.
+
+[small pause]
+
 ---
 
 # Structures
@@ -418,7 +437,13 @@ variables {σ : signature} {α : Type u} [nonempty α]
 
 ???
 
-TODO
+Here we define the type of first-order structures with signature **sigma** and and domain in 
+a nonempty type **alpha**. It simply consists of an interpretation for the functional symbols, 
+as operators, and an interpretation of the relational symbols are relations.
+
+We define the type of variable assignment as simply the type of maps of variables to values in **alpha**
+
+We next declare some variables that we are going to use for our next definitions.
 
 ---
 
@@ -440,7 +465,14 @@ def signature.vasgn.bind (ass : σ.vasgn α) (x : σ.vars) (val : α) : σ.vasgn
 
 ???
 
-TODO
+This function returns the reference of a term in a structure relative to a variable assignment.
+It is defined recursively, so that in the base case the reference of a variable is the one determined by the
+assignment, the reference of a constant is its reference as interpreted by the structure, and the reference of a term
+obtained by function application is the result of applying the interpretation of the functional symbol to the references 
+of the nested subterms.
+
+We also implement the bind function which generates a new assignment from an old one in which the variable 
+**x** is essentially bound or interpreted to the value **val**.
 
 ---
 
@@ -466,7 +498,14 @@ def signature.structure.satisfies' : σ.structure α →  σ.formula → σ.vasg
 ```
 ???
 
-TODO
+Here we define also in a recursive manner the semantics for a formula in the calculus.
+This is the usual Tarskian semantics.
+
+It is particularly interesting to notice the implementation of the rule for the universal quantifier, 
+since the remaining rules are rather trivial.
+
+The false formula is of course, by definition, never satisfied by any structure, regardless 
+of variable assignment. This will be important later in the consistency proof.
 
 ---
 
@@ -478,14 +517,19 @@ def signature.structure.satisfies : σ.structure α → σ.formula → Prop
 | M φ := ∀ (ass : σ.vasgn α), M.satisfies' φ ass
 
 -- will reserve ⊨ without subscript for 
--- semantic consequence of theories.
+-- semantic consequence of formulas.
 local infixr `⊨₁`:55 := signature.structure.satisfies
 
 ```
 
 ???
 
-TODO
+Here we simply define the notion of satisfiability in a structure regardless of variable assignment.
+We introduce the notation that the subscripted version of the double turnslide symbol will stand for
+the satisfiability relation between structures and formulas. The non-subscripted version of the same symbol
+will stand for the relation of semantic consequence between sets of formulas and formulas. This is done so
+that we can introduce the soundness theorem to be proven using standard logic notation, as shall become
+clear in the next slide.
 
 ---
 
@@ -515,7 +559,21 @@ begin
     
 ???
 
-TODO
+Finally we reach the statement of the soundness proof itself. 
+The proof will continue in the next few slides.
+
+We notice that we begin the proof by introducing assumptions using the Lean intro tactic.
+The proof then proceeds, as is custumary by induction on the proof of **phi** from **Gamma**.
+The induction tactic used here introduces one goal to be proven for every proof constructor,
+i.e. for every natural deduction rule. 
+
+The proofs for most cases were rather simple, and a more throught description of them
+can only be obtained by opening up the lean files in vscode and using the linter to see
+each tactic command changing the state of the proof one step at a time. 
+We encourage the listener to access our github repository and check out the full code.
+
+In what follows therefore we will be primarily interested in describing the proofs
+for the cases of the universal quantifier, since those are the most important and difficult cases.
 
 ---
 
@@ -594,7 +652,14 @@ TODO
   
 ???
 
-TODO
+The first case here is the one in which the proof was proven by
+contradiction, TODO
+
+
+The second case the one in which the formula to be proven is
+a trivial equality of the form **x = x**. Notice the 2 line proof of this
+second case is just a matter of unfolding the definition of satisfiability of
+a formula in a structure.
 
 ---
 
@@ -630,6 +695,9 @@ TODO
 # Consistency Proof
 
 ```haskell
+
+def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
+
 theorem consistency : consistent (∅ : set σ.formula) := 
 begin
     intro h,
@@ -660,7 +728,7 @@ class: center, middle
 
 ???
 
-[Finish with video showing my face, giving thanks for allowing me to participate of the conference]
+[Finish with video showing my face, giving thanks for allowing me to participate in the conference]
 
 
     </textarea>
