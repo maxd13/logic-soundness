@@ -468,7 +468,7 @@ theorem consistency : consistent (∅ : set σ.formula) :=
 begin
     intro h,
     obtain ⟨x⟩ := h,
-    replace h := @soundness σ ∅ signature.formula.false x,
+    have h := @soundness σ ∅ signature.formula.false x,
     revert h,
     dunfold signature.follows,
     simp,

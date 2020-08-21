@@ -108,7 +108,7 @@ in the Lean interactive theorem prover.
 ???
 
 In this project we were motivated primarily by the opportunity for personal learning
-of the Lean theorem prover itself as a formalization tool, and of the details involved in the
+of the Lean theorem prover itself, and of the details involved in the
 soundness and consistency proofs of first order predicate logic. 
 We were also interested in the possibility of using Lean as a tool for teaching 
 logic to students in the future, since code is often able to clarify most ambiguities in the 
@@ -117,7 +117,7 @@ calculus.
 
 So, in the future we plan to formalize the completeness proof of the calculus for our personal understanding. 
 One interesting research problem in this direction would be to investigate by formal
-means the pros and cons of an algebraic proof of completeness (via Cyllindric algebras) 
+means the pros and cons of an algebraic proof of completeness (such as one via Cyllindric algebras) 
 versus the more classical Godelian proof. 
 
 ---
@@ -146,7 +146,7 @@ in the same language as the theorem prover itself, via a tactics metaprogramming
 
 So, personally I started learning Lean as my first proof assistant. 
 That makes it hard for me to compare it with other proof assistants,
-since I don't have the same experience with Isabelle and CoQ. 
+since I don't have the same experience with Isabelle or CoQ. 
 I preferred diving a little bit deeper in Lean than trying to learn to use 
 several provers at once.
 
@@ -174,12 +174,14 @@ Roughly 1000 lines of Lean code.
 
 ???
 
+[small pause]
+
 We divided our implementation into 2 modules, the first
 handles the syntax of the language and the deductive system, 
 the second gives semantics to the language and contains the soundness 
 and consistency proofs. The project has roughly 1000 lines of Lean code.
 
-We are going to explain today the sections of our work marked in bold. 
+We are going to explain today only the sections of our work that are marked in bold. 
 The other sections will have to be skipped since it would 
 be impossible to explain them within 10 minutes.
 
@@ -206,31 +208,29 @@ structure signature : Type (u+1) :=
 
 ???
 
-Perhaps the most interesting aspect of our implementation is the usage
+One interesting aspect of our implementation is the usage
 of dependent types to define a signature abstraction which can be used polymorphically
 to define multiple formal languages.
 
 As can be seen, the signature contains a type of functional symbols, a type of relational symbols,
-a type of modal operator symbols, a type of variables, a decision procedure for equality between variables,
+a type of modal operator symbols, a type of variables, a decision procedure for equality between variables 
+(which is the dec_vars field shown in this slide),
 and 3 maps which associate arities to each different kind of symbol.
 
 We can see here that all of the fields are optional and come with sensible defaults.
-Variables are by the default natural numbers, but any type can be chosen provided
+Variables are by default the natural numbers, but any type can be chosen provided
 that equality between instances of that type is decidable,
 as this is required in many proofs.
 
-Ok, so then the type of first-order formulas will be defined in terms an instance of this type, as a dependent type.
-It will be depending on an instance of this type for its definition.
-
-Depending on which signature we use,
+Ok, so the type of first-order formulas will later be defined in terms of an instance of this signature type,
+as a dependent type. Depending on which signature we use,
 a different calculus would end up being defined
 ; this allows us to keep all the information required to define
 the most usual kinds of logical languages packed into the same type.
-
 And since our soundness proof is agnostic about the signature we are using,
 it amounts to a proof of the soundness of many different logics.
 
-Modalities were added there to foreshadow a future development direction I have in mind, but they were ignored
+Modalities were added there for generality, and to foreshadow a future development direction I have in mind, but they were ignored
 in the rest of our implementations.
 
 
@@ -263,14 +263,14 @@ inductive signature.term (σ : signature)
 
 Here we see that we define the type of terms of the signature.
 First we declare a signature sigma as a variable, 
-then we declare the type of functional symbols of a given arity,
+then we declare the dependent type of functional symbols of a given arity,
 the type of relational symbols of a given arity, 
 the type of constant functional symbols, and finally the type of terms.
 
 We see that terms are defined inductively from the variables and functional 
 symbols of the signature. So this definition states that a term is either a variable
-or the junction of a functional symbol of arity n with other n previously defined terms.
-These n other terms are introduced here via the function `v`.
+or the composition of a functional symbol of arity **n** with other **n** previously defined terms.
+These **n** other terms are introduced here via the function `v`.
 
 ---
 
@@ -297,14 +297,14 @@ instance  signature.formula.has_exp : has_exp  σ.formula := ⟨signature.formul
 
 Formulas are defined inductively in the usual way from the terms.
 A formula is either generated from a relational symbol
-which is "applied" to terms, an equation between terms,
+which is, in a sense, "applied" to terms, an equation between terms,
 the false formula, 
 or generated from these atomic formulas by means of universal
 quantification or the implication connective, if_then.
 
 For this last connective we also set up a convenient notation using Lean's 
 class resolution mechanism, which in this case sets up the arrow symbol 
-to be associated with the has_exp class, which is instantiated with the the if_then formula
+to be associated with the has_exp class, which is instantiated with the if_then formula
 constructor. Now whenever we use this arrow as an infixed function of 2 formulas, Lean already
 knows how to elaborate the instance we defined and apply the if_then constructor. 
 
@@ -336,10 +336,10 @@ So, moving to the proof system, we define a system of natural deduction for the
 predicate calculus inductively using a dependent type of proofs. This is the type of all
 proofs of a formula **phi** from a set of formulas **Gamma**. Natural deduction rules are proof constructors.
 
-With the exception of the the reflexivity and transitivity rules, 
+With the exception of the reflexivity and transitivity rules, 
 and the rules for reasoning by contradiction, each proof constructor is either an elimination 
 or an introduction rule for one of the connectives, the universal quantifier, or equality.
-In portion of the code, the third rule is implication elimination, also known as modus ponens.
+In this part of the code, the third rule is implication elimination, also known as modus ponens.
 The fourth rule is implication introduction, shortnamed intro after the name of a Lean tactic
 which works the same way.
 
@@ -411,7 +411,7 @@ Here we clearly have the rules for equality, i.e. identity relation of the calcu
 The first rules simply states that identity is reflexive, while the second allows substitution 
 *salva veritate* to occur for equal terms within formulas.
 
-To conclude the definition of our system, we set up the tilde symbol as an infixed operator
+To conclude the definition of our system, we set up the turnstile symbol as an infixed operator
 to refer to the type of proofs, as is standard notation for proof systems.
 
 [small pause]
@@ -437,11 +437,11 @@ variables {σ : signature} {α : Type u} [nonempty α]
 
 ???
 
-Here we define the type of first-order structures with signature **sigma** and and domain in 
+Here we define the type of first-order structures with signature **sigma** and domain in 
 a nonempty type **alpha**. It simply consists of an interpretation for the functional symbols, 
-as operators, and an interpretation of the relational symbols are relations.
+as operators, and an interpretation of the relational symbols as relations.
 
-We define the type of variable assignment as simply the type of maps of variables to values in **alpha**
+We define the type of variable assignments as simply the type of maps of variables to values in **alpha**
 
 We next declare some variables that we are going to use for our next definitions.
 
@@ -454,8 +454,9 @@ We next declare some variables that we are going to use for our next definitions
 def signature.structure.reference' (M : σ.structure α) : σ.term → σ.vasgn α → α
 | (signature.term.var x) asg := asg x
 | (@signature.term.app _ 0 f _) _ := M.I₁ f fin_zero_elim
-| (@signature.term.app _  (n+1) f v) asg := let v₂ := λ k, signature.structure.reference' (v k) asg
-                                    in M.I₁ f v₂
+| (@signature.term.app _  (n+1) f v) asg := 
+    let v₂ := λ k, signature.structure.reference' (v k) asg
+    in M.I₁ f v₂
 
 -- bind the value of a variable to `val` in an assignment 
 -- (generates a new assignment).
@@ -520,12 +521,20 @@ def signature.structure.satisfies : σ.structure α → σ.formula → Prop
 -- semantic consequence of formulas.
 local infixr `⊨₁`:55 := signature.structure.satisfies
 
+-- semantic consequence.
+-- Tells whether φ is true in every model/assignment in which Γ is true.
+def signature.follows (σ : signature) (Γ : set σ.formula) (φ : σ.formula) : Prop :=
+    ∀{α : Type u}[h : nonempty α] (M : @signature.structure σ α h) (ass : σ.vasgn α),
+      (∀ ψ ∈ Γ, @signature.structure.satisfies' σ α h M ψ ass) → @signature.structure.satisfies' σ α h M φ ass
+
+local infixr `⊨`:55 := signature.follows σ
+
 ```
 
 ???
 
 Here we simply define the notion of satisfiability in a structure regardless of variable assignment.
-We introduce the notation that the subscripted version of the double turnslide symbol will stand for
+We introduce the notation that the subscripted version of the double turnstile symbol will stand for
 the satisfiability relation between structures and formulas. The non-subscripted version of the same symbol
 will stand for the relation of semantic consequence between sets of formulas and formulas. This is done so
 that we can introduce the soundness theorem to be proven using standard logic notation, as shall become
@@ -563,17 +572,29 @@ Finally we reach the statement of the soundness proof itself.
 The proof will continue in the next few slides.
 
 We notice that we begin the proof by introducing assumptions using the Lean intro tactic.
-The proof then proceeds, as is custumary by induction on the proof of **phi** from **Gamma**.
-The induction tactic used here introduces one goal to be proven for every proof constructor,
-i.e. for every natural deduction rule. 
+To prove the soundness statement we assume we have a proof
+of **phi** from **Gamma** called **proof**, a type **alpha**
+which is nonempty, a structure **M**, a variable assignment 
+a.s.s and we assume, via the hypothesis named **h**, 
+that **M** satisfies all formulas of **Gamma** 
+in this assignment. 
+The proof goal then becomes to show that **M** also
+satisfied **phi**.
 
-The proofs for most cases were rather simple, and a more throught description of them
-can only be obtained by opening up the lean files in vscode and using the linter to see
+The proof then proceeds, as is customary, by induction on the proof of **phi** from **Gamma**.
+The induction tactic used here introduces one goal to be proven for every proof constructor,
+i.e. for every natural deduction rule. In our case this means we have 10 different proof goals.
+
+The proofs for most cases were rather simple, but a more throughout description of them
+can only be obtained by opening the lean files in vscode and using the linter to see
 each tactic command changing the state of the proof one step at a time. 
 We encourage the listener to access our github repository and check out the full code.
 
-In what follows therefore we will be primarily interested in describing the proofs
-for the cases of the universal quantifier, since those are the most important and difficult cases.
+In what follows therefore we will only be summarily describing
+the simplest proof cases. We will compensate for
+this omission by being more explicit in the final 
+consistency proof, for which the soundness proof is
+but a lemma.
 
 ---
 
@@ -600,7 +621,28 @@ for the cases of the universal quantifier, since those are the most important an
   
 ???
 
-TODO
+Here, in the case of universal introduction, 
+the goal is to show that **M** satisfies 
+an universally quantified formula with respect to the assignment.
+For this the first tactic introduces an instance **x** of
+type **alpha**, so that if we bind the quantified variable
+to **x** it suffices to show that **M** satisfies the
+scoped formula in this new assignment. Because the specific
+assignment can be generalized in the proof, we can 
+assume in practice that **M** satisfies all formulas
+of **Gamma** regardless of assignment. The next 2
+tactics, which utilize lemmas proved previously, 
+conclude therefore that **M** satisfies all formulas
+of **Gamma** in the new assignment where the quantified
+variable is bound to value x. 
+
+It is then just a matter of applying to the conclusion c
+the induction hypothesis,
+which says that if all formulas of **Gamma** are
+satisfied by **M** in the new assignment, then
+the scoped formula is also satisfied in this assignment.
+We already have the implication of this modus ponens
+application in the conclusion **c**.
 
 ---
 
@@ -627,7 +669,23 @@ TODO
   
 ???
 
-TODO
+The universal elimination case is perhaps one of the most
+complex cases in our proof; but semantically 
+it is perhaps less interesting than our proof of the
+universal introduction. We will therefore be forced to skip
+commenting on this case. 
+
+The exfalso quodlibet case is, unsurprisingly, 
+proven to be sound by an application of the same
+principle of proof in the meta-language, which is
+here codified in the exfalso tactic. This tactic simply 
+changes the proof goal to the proposition **false**.
+To wit, the effect of the tactic is that
+if we can prove **false** we can prove whatever else
+the original goal was.
+
+The proof is then given by a trivial unfolding of
+the notion of satisfiability in the induction hypothesis.
 
 ---
 
@@ -653,56 +711,73 @@ TODO
 ???
 
 The first case here is the one in which the proof was proven by
-contradiction, TODO
+contradiction. Suffices to say about it that it proves
+the soundness of this rule with reasoning by contradiction,
+which is also called doing a *reductio ad absurdum*. 
+This requires the use of classical logic, which is why
+the first tactic of the proof is used to allow us
+to do this sort of reasoning without hindrance.
 
-
-The second case the one in which the formula to be proven is
+The second case is the one in which the formula to be proven is
 a trivial equality of the form **x = x**. Notice the 2 line proof of this
 second case is just a matter of unfolding the definition of satisfiability of
 a formula in a structure.
 
+We will be skipping the more complex 
+identity elimination case for lack of time
+in this presentation. So now we can finally
+move on to the proof of the consistency of logic.
+
 ---
 
-# Soundness Proof
+# Consistency
 
 ```haskell
-  -- case identity elimination
-  have ih₁ := proof_ih_h ass h,
-  have ih₂ := proof_ih_eq ass h,
-  rename proof_sub₁ sub₁,
-  rename proof_sub₂ sub₂,
-  replace ih₁ := (@rw_semantics σ α ne M ass proof_x proof_t₁ proof_φ sub₁).mp ih₁,
-  apply (rw_semantics sub₂).2,
-  convert ih₁ using 2,
-  revert ih₂,
-  dunfold signature.structure.satisfies',
-  simp,
-  intro ih₂,
-  rw ←ih₂,
-end
+def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
 
 instance inhabited_structure : inhabited (σ.structure unit) := 
 ⟨{ I₁ := λ _ _ _, unit.star,
   I₂ := λ _ _ _, true }⟩
+
+lemma false_is_unsat : ¬∃ M : σ.structure α, M ⊨₁ signature.formula.false 
+:= 
+begin
+  intro h,
+  obtain ⟨M, h⟩ := h,
+  apply nonempty.elim _inst_1,
+  intro x,
+  exact h (λ_, x),
+end
 ```
 
 ???
 
-TODO
+For the consistency proof, we first define the 
+notion of a set of formulas being consistent, which is simply
+that there is no proof of the **false** formula from
+the set.
+
+Next we provide a default structure for the type **unit**,
+which is the type which only has a single element called **unit.star**.
+This structure is obviously a model for the empty set of formulas, 
+just as is any structure. In effect what this shows is
+that the empty set of sentences has a model, 
+i.e. that it is satisfiable.
+
+We also require to prove that the false formula is
+unsatisfiable. We skip commenting on its proof,
+which is rather trivial.
 
 ---
 
 # Consistency Proof
 
 ```haskell
-
-def consistent (Γ : set  σ.formula) := ¬ nonempty (Γ ⊢  signature.formula.false)
-
 theorem consistency : consistent (∅ : set σ.formula) := 
 begin
     intro h,
     obtain ⟨x⟩ := h,
-    replace h := @soundness σ ∅ signature.formula.false x,
+    have h := @soundness σ ∅ signature.formula.false x,
     revert h,
     dunfold signature.follows,
     simp,
@@ -718,18 +793,93 @@ end
 
 ???
 
-TODO
+For the consistency proof itself, 
+its general outlook is very simple. From soundness it follows
+that if the empty set proved the **false** formula, 
+then all of its models would satisfy it, and so in 
+particular the default model we defined would satisfy it.
+But because false is unsatisfiable this model could not
+satisfy it, reaching thus an absurdity. 
+It then follows that there is no proof of the **false**
+from the empty set, hence the empty set is consistent.
+
+For the formalization, the first line introduces the
+assumption that the type of proofs of **false** from
+the empty set is nonempty. The proof goal then becomes
+to reach an absurdity, which is to say, to provide a
+proof of the **false** proposition.
+
+**nonempty** is a parametric
+inductively defined type which can only be constructed by
+presenting an instance of that type. The tactic **obtain**
+is able to destruct any instance of an inductive type
+to the values that were used for its construction.
+In this case, the **x** becomes an instance 
+of the aforementioned type of proofs, i.e. 
+it is a proof of the false from the empty set.
+
+The third line introduces the auxiliary result that 
+given the proof x it follows from the soundness theorem
+that the false formula is a semantic consequence of
+the empty set of formulas. The next 4 lines 
+essentially unfold the definition of semantic 
+consequence and simplify the result. 
+At the end the hypothesis says that every possible
+structure satisfies the **false** formula.
+The next line introduces the structure we defined previously
+into the scope of our proof, via the variable **M**.
+
+The simplified hypothesis **h** can then be specialized to
+the structure **M**, since it says that every structure whatsoever
+satisfies **false**, it follows that **M** in particular satisfies **false**.
+
+By applying the false_is_unsat lemma in the next line,
+and then simplifying its statement by unfolding the definition of
+satisfiability, the proof goal changes from the **false** 
+proposition to the claim that there exists a structure which
+satisfies the **false** formula. We then simply introduce
+**M** to be such a structure in the next 2 lines, 
+and the proof is complete.
 
 ---
 
+class: center, middle
+# **Conclusion**
 
+<a>https://github.com/maxd13/logic-soundness</a>
+
+???
+
+We have summarized our implementation of the soundness proof
+and gave a full description of the consistency proof.
+We conclude our presentation by pointing out that many more details could still be given
+about how the proofs were constructed, and the difficulties which lied therein. 
+We emphatically urge the listener to access our github repository at 
+github.com "slash" m a x d 13 "slash" logic "hyphen" soundness, to check the details
+of our work.
+
+Our work still gives many opportunities for expansion.
+One obvious, yet much more laborious, development would be
+to formalize the completeness proof of the logic. 
+We believe in the future we will be interested in extending our research
+in the direction of using Lean for the formal study 
+of quantified modal logics and their algebraizations. 
+This would also allow us to compare different kinds of completeness
+proofs depending on the algebraic interpretation of logic we choose to implement.
+There is, as such, much still in store for the future.
+
+---
 class: center, middle
 # ***Fin***
 
 ???
+We thank the organizers of WBL for allowing us to present our work in this conference today.
+We give special thanks to professor Edward Hermann from PUC Rio, for guiding me in this research
+and for initially suggesting that we should submit our article in this conference. 
 
-[Finish with video showing my face, giving thanks for allowing me to participate in the conference]
+We hope we can see you guys again in the future. Thank you very much.
 
+[End Video]
 
     </textarea>
   <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
